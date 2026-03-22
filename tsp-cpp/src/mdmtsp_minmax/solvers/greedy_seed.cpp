@@ -5,12 +5,14 @@ namespace mdmtsp_minmax {
 
 Solution SolveGreedySeed(const Instance& inst) {
     Solution sol;
-    if (inst.k_vehicles <= 0 || inst.depots.empty()) return sol;
+    auto route_depots = inst.ExpandedDepotVehicles();
+    if (route_depots.empty()) return sol;
 
-    sol.routes.resize(inst.k_vehicles);
-    std::vector<double> lengths(inst.k_vehicles, 0.0);
-    for (int r = 0; r < inst.k_vehicles; ++r) {
-        sol.routes[r].depot_id = inst.depots[r % static_cast<int>(inst.depots.size())];
+    const int n_routes = static_cast<int>(route_depots.size());
+    sol.routes.resize(n_routes);
+    std::vector<double> lengths(n_routes, 0.0);
+    for (int r = 0; r < n_routes; ++r) {
+        sol.routes[r].depot_id = route_depots[r];
     }
 
     std::vector<int> customers = inst.Customers();
@@ -18,7 +20,7 @@ Solution SolveGreedySeed(const Instance& inst) {
         int best_r = 0;
         double best_obj = 1e300;
 
-        for (int r = 0; r < inst.k_vehicles; ++r) {
+        for (int r = 0; r < n_routes; ++r) {
             const int depot = sol.routes[r].depot_id;
             double new_len = inst.RouteLength(depot, sol.routes[r].nodes);
             std::vector<int> candidate = sol.routes[r].nodes;
@@ -26,7 +28,7 @@ Solution SolveGreedySeed(const Instance& inst) {
             new_len = inst.RouteLength(depot, candidate);
 
             double obj = 0.0;
-            for (int rr = 0; rr < inst.k_vehicles; ++rr) {
+            for (int rr = 0; rr < n_routes; ++rr) {
                 if (rr == r) obj = std::max(obj, new_len);
                 else obj = std::max(obj, lengths[rr]);
             }
@@ -42,7 +44,7 @@ Solution SolveGreedySeed(const Instance& inst) {
     }
 
     sol.max_route_length = 0.0;
-    for (int r = 0; r < inst.k_vehicles; ++r) {
+    for (int r = 0; r < n_routes; ++r) {
         sol.routes[r].length = inst.RouteLength(sol.routes[r].depot_id, sol.routes[r].nodes);
         sol.max_route_length = std::max(sol.max_route_length, sol.routes[r].length);
     }

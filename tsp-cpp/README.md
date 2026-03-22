@@ -115,9 +115,17 @@ python3 run.py \
 
 ## mdmtsp_minmax
 
-Подготовлен унифицированный каркас модулей и runner'а (`--problem mdmtsp_minmax`).
-Сейчас это scaffold с ответом `status=not_implemented`, но структура каталогов и API уже разделены под отдельную реализацию.
+Поддержаны два простых baseline solver'а:
+- `greedy_seed`
+- `random` (template: случайные раскладки, по умолчанию 100 итераций)
 
+### Что такое `k_vehicles` и `depot_vehicle_limits`
+- `depots` — массив depot-вершин (их может быть k штук).
+- `k_vehicles` — **общее** число агентов (суммарно по всем depot).
+- `depot_vehicle_limits` — явное распределение агентов по depot (классический вариант с `m_i`).
+
+Если задан только `k_vehicles`, раннер распределяет агентов по depot равномерно round-robin.
+Если задан `depot_vehicle_limits`, он имеет приоритет и задает точные `m_i` по depot.
 
 ### JSON формат mdmtsp_minmax
 
@@ -127,7 +135,8 @@ python3 run.py \
   "format": "matrix",
   "matrix": [[0, 10, 4], [10, 0, 7], [4, 7, 0]],
   "depots": [0],
-  "k_vehicles": 2
+  "k_vehicles": 2,
+  "depot_vehicle_limits": [1]
 }
 ```
 

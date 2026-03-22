@@ -8,15 +8,17 @@ namespace {
 
 Solution BuildRandomSolution(const Instance& inst, std::mt19937& rng) {
     Solution sol;
-    if (inst.k_vehicles <= 0 || inst.depots.empty()) return sol;
+    auto route_depots = inst.ExpandedDepotVehicles();
+    if (route_depots.empty()) return sol;
 
-    sol.routes.resize(inst.k_vehicles);
-    for (int r = 0; r < inst.k_vehicles; ++r) {
-        sol.routes[r].depot_id = inst.depots[r % static_cast<int>(inst.depots.size())];
+    const int n_routes = static_cast<int>(route_depots.size());
+    sol.routes.resize(n_routes);
+    for (int r = 0; r < n_routes; ++r) {
+        sol.routes[r].depot_id = route_depots[r];
     }
 
     auto customers = inst.Customers();
-    std::uniform_int_distribution<int> route_pick(0, inst.k_vehicles - 1);
+    std::uniform_int_distribution<int> route_pick(0, n_routes - 1);
     for (int c : customers) {
         int r = route_pick(rng);
         sol.routes[r].nodes.push_back(c);

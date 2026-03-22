@@ -53,6 +53,8 @@ def build_mdmtsp_payload(task_path: Path) -> dict:
     task = json.loads(task_path.read_text(encoding="utf-8"))
     if task.get("problem") != "mdmtsp_minmax":
         raise ValueError("JSON task must have problem=mdmtsp_minmax")
-    if "depots" not in task or "k_vehicles" not in task:
-        raise ValueError("mdmtsp_minmax task requires depots and k_vehicles")
+    if "depots" not in task:
+        raise ValueError("mdmtsp_minmax task requires depots")
+    if "k_vehicles" not in task and "depot_vehicle_limits" not in task:
+        raise ValueError("mdmtsp_minmax task requires k_vehicles or depot_vehicle_limits")
     return task
