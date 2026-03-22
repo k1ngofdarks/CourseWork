@@ -1,6 +1,8 @@
 #include <instance.h>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
+#include <cmath>
 #include "../include/json.hpp"
 
 namespace tsp {
@@ -11,7 +13,7 @@ namespace tsp {
     }
 
     inline std::vector<std::vector<double>>
-    CalculateDistances(const std::vector<double> &lat_deg, const std::vector<double> &lon_deg) {
+    CalculateSphereDistances(const std::vector<double> &lat_deg, const std::vector<double> &lon_deg) {
         const double R = 6371.0;
         size_t n = lat_deg.size();
         std::vector<double> lat(n), lon(n);
@@ -31,9 +33,23 @@ namespace tsp {
         return dist;
     }
 
-    inline std::vector<std::vector<double>> ParseCalculateDistances(const nlohmann::json &json,
-                                                                   std::vector<double>& lat_out,
-                                                                   std::vector<double>& lon_out) {
+    inline std::vector<std::vector<double>> CalculateEuclideanDistances(
+            const std::vector<std::vector<double>> &coords) {
+        const size_t n = coords.size();
+        std::vector<std::vector<double>> dist(n, std::vector<double>(n));
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < n; ++j) {
+                double dx = coords[i][0] - coords[j][0];
+                double dy = coords[i][1] - coords[j][1];
+                dist[i][j] = std::sqrt(dx * dx + dy * dy);
+            }
+        }
+        return dist;
+    }
+
+    inline std::vector<std::vector<double>> ParseLatLonDistances(const nlohmann::json &json,
+                                                                  std::vector<double>& lat_out,
+                                                                  std::vector<double>& lon_out) {
         size_t n = json["n"];
         std::vector<double> lat(n), lon(n);
         const nlohmann::json &row_lat = json["latlon"][0];
@@ -49,13 +65,76 @@ namespace tsp {
         lat_out = lat;
         lon_out = lon;
 
-        return CalculateDistances(lat, lon);
+        return CalculateSphereDistances(lat, lon);
+    }
+
+    inline std::vector<std::vector<double>> ParseMatrix(const nlohmann::json &json, int &n_out) {
+        const nlohmann::json &matrix = json["matrix"];
+        n_out = static_cast<int>(matrix.size());
+        std::vector<std::vector<double>> dist(n_out, std::vector<double>(n_out));
+        for (int i = 0; i < n_out; ++i) {
+            if (!matrix[i].is_array() || static_cast<int>(matrix[i].size()) != n_out) {
+                throw std::runtime_error("Matrix should be NxN array");
+            }
+            for (int j = 0; j < n_out; ++j) {
+                dist[i][j] = matrix[i][j].get<double>();
+            }
+        }
+        return dist;
+    }
+
+    inline std::vector<std::vector<double>> ParseCoordinates(const nlohmann::json &json,
+                                                              int &n_out,
+                                                              std::vector<double>& lat_out,
+                                                              std::vector<double>& lon_out) {
+        const nlohmann::json &coords = json["coordinates"];
+        n_out = static_cast<int>(coords.size());
+        std::vector<std::vector<double>> points(n_out, std::vector<double>(2));
+        for (int i = 0; i < n_out; ++i) {
+            if (!coords[i].is_array() || coords[i].size() != 2) {
+                throw std::runtime_error("Each coordinate should have size 2");
+            }
+            points[i][0] = coords[i][0].get<double>();
+            points[i][1] = coords[i][1].get<double>();
+        }
+
+        std::string metric = json.value("metric", "euclidean");
+        if (metric == "euclidean") {
+            return CalculateEuclideanDistances(points);
+        }
+        if (metric == "sphere") {
+            std::vector<double> lat(n_out), lon(n_out);
+            for (int i = 0; i < n_out; ++i) {
+                lat[i] = points[i][0];
+                lon[i] = points[i][1];
+            }
+            lat_out = lat;
+            lon_out = lon;
+            return CalculateSphereDistances(lat, lon);
+        }
+        throw std::runtime_error("Unknown metric. Supported: euclidean, sphere");
     }
 
     Instance::Instance() {
         auto json = nlohmann::json::parse(ReadAllStdin());
-        n = json["n"];
-        mat = ParseCalculateDistances(json, latitudes, longitudes);
+        if (json.contains("matrix")) {
+            mat = ParseMatrix(json, n);
+            return;
+        }
+
+        if (json.contains("coordinates")) {
+            mat = ParseCoordinates(json, n, latitudes, longitudes);
+            return;
+        }
+
+        if (json.contains("latlon")) {
+            n = json["n"];
+            mat = ParseLatLonDistances(json, latitudes, longitudes);
+            return;
+        }
+
+        throw std::runtime_error(
+                "Invalid instance format. Expected one of: matrix, coordinates, latlon");
     }
 
     int Instance::GetN() const {

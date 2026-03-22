@@ -21,7 +21,15 @@ Runner для тестирования cpp солверов
 - Проект создает каталог `build` и считает `build/src/tsp` исполняемым файлом по умолчанию
 
 ### Запуск солвера
-Запуск следует производить, находясь в папке tsp-cpp
+Запуск следует производить, находясь в папке tsp-cpp.
+
+Поддерживаются два формата задач:
+- `.txt` — старый формат (n + список id), координаты берутся из `--coords`.
+- `.json` — новый формат с тремя режимами:
+  - через `ids` + `coords` (`.npz`, как раньше),
+  - через готовую матрицу расстояний `matrix`,
+  - через `coordinates` и метрику `metric` (`euclidean` или `sphere`).
+
 ```bash
 python3 run.py --task path/to/task --coords path/to/dataset --step solver1_name [--arg1 val1 --arg2 val2 ...] --step solver2_name [...]
 ```
@@ -29,6 +37,32 @@ python3 run.py --task path/to/task --coords path/to/dataset --step solver1_name 
 Например: 
 ```bash
 python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step nearest --start 10
+```
+
+Примеры JSON:
+
+```json
+{
+  "ids": [1088888, 78098, 73387],
+  "coords": "World_TSP.npz"
+}
+```
+
+```json
+{
+  "matrix": [
+    [0.0, 4.0, 7.0],
+    [4.0, 0.0, 2.0],
+    [7.0, 2.0, 0.0]
+  ]
+}
+```
+
+```json
+{
+  "coordinates": [[55.75, 37.61], [59.93, 30.31], [56.84, 60.61]],
+  "metric": "sphere"
+}
 ```
 
 ### Вывод:

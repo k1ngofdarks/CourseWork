@@ -5,7 +5,7 @@ import logging
 import json
 import subprocess
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 
 import numpy as np
 
@@ -13,9 +13,9 @@ from python.validate import validate_tour
 from python.cpp_updater import recompiles_if_necessary
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Solve Metric TSP from a task file (n_nodes + ids).")
-    p.add_argument("--task", type=str, required=True, help="Path to task txt (line1: n_nodes, line2: ids).")
-    p.add_argument("--coords", type=str, default="World_TSP.npz", help="Path to coordinates NPZ [idx, lat, lon].")
+    p = argparse.ArgumentParser(description="Solve Metric TSP from TXT or JSON task.")
+    p.add_argument("--task", type=str, required=True, help="Path to task txt/json.")
+    p.add_argument("--coords", type=str, default="World_TSP.npz", help="Default NPZ path for txt task mode.")
     return p.parse_known_args()
 
 
@@ -43,6 +43,59 @@ def save_solution(task_path: Path, route_ids: List[int]) -> Path:
     return out_path
 
 
+def build_payload_from_txt(task_path: Path, coords_path: Path) -> Tuple[str, int, List[int]]:
+    n_nodes, ids = read_task(task_path)
+    id_to_coord = load_coords(coords_path)
+    latlon = latlon_for_selected(ids, id_to_coord)
+    payload_obj = {"n": n_nodes, "latlon": latlon.T.tolist()}
+    return json.dumps(payload_obj), n_nodes, ids
+
+
+def _parse_json_npz_mode(task_json: Dict[str, Any], base_dir: Path, fallback_coords: Path) -> Tuple[str, int, List[int]]:
+    ids = task_json["ids"]
+    n_nodes = int(task_json.get("n", len(ids)))
+    if len(ids) != n_nodes:
+        raise ValueError(f"ids length {len(ids)} does not match n_nodes {n_nodes}")
+
+    coords_arg = task_json.get("coords", str(fallback_coords))
+    coords_path = Path(coords_arg)
+    if not coords_path.is_absolute():
+        coords_path = base_dir / coords_path
+    id_to_coord = load_coords(coords_path)
+    latlon = latlon_for_selected(ids, id_to_coord)
+    payload_obj = {"n": n_nodes, "latlon": latlon.T.tolist()}
+    return json.dumps(payload_obj), n_nodes, ids
+
+
+def build_payload_from_json(task_path: Path, fallback_coords: Path) -> Tuple[str, int, List[int]]:
+    task_json = json.loads(task_path.read_text(encoding="utf-8"))
+
+    if "matrix" in task_json:
+        n_nodes = len(task_json["matrix"])
+        ids = list(range(n_nodes))
+        payload_obj = {"matrix": task_json["matrix"]}
+        return json.dumps(payload_obj), n_nodes, ids
+
+    if "coordinates" in task_json:
+        coordinates = task_json["coordinates"]
+        n_nodes = len(coordinates)
+        ids = task_json.get("ids", list(range(n_nodes)))
+        if len(ids) != n_nodes:
+            raise ValueError(f"ids length {len(ids)} does not match n_nodes {n_nodes}")
+        payload_obj = {
+            "coordinates": coordinates,
+            "metric": task_json.get("metric", "euclidean"),
+        }
+        return json.dumps(payload_obj), n_nodes, ids
+
+    if "ids" in task_json:
+        return _parse_json_npz_mode(task_json, task_path.parent, fallback_coords)
+
+    raise ValueError(
+        "JSON task must contain one of: matrix, coordinates, or ids (for NPZ mode)."
+    )
+
+
 def main() -> None:
     args, cpp_args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -50,10 +103,10 @@ def main() -> None:
     task_path = Path(args.task)
     coords_npz = Path(args.coords)
 
-    n_nodes, ids = read_task(task_path)
-    id_to_coord = load_coords(coords_npz)
-    latlon = latlon_for_selected(ids, id_to_coord)
-    payload = json.dumps({"n": n_nodes, "latlon": latlon.T.tolist()})
+    if task_path.suffix.lower() == ".json":
+        payload, n_nodes, ids = build_payload_from_json(task_path, coords_npz)
+    else:
+        payload, n_nodes, ids = build_payload_from_txt(task_path, coords_npz)
 
     recompiles_if_necessary()
 
@@ -79,5 +132,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
