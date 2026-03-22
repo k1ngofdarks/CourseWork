@@ -1,47 +1,128 @@
-Runner для тестирования cpp солверов
+Runner для TSP и Min-Max Multi-Depot mTSP
 ==============
 
-### Структура проекта
+## Структура (header рядом с C++)
 
-- Каталог `python` отвечает за скрипты на языке `python`
-- Каталоги `icnlude` и `src` за header и source файлы
-- Подкаталог `src/solvers` отвечает за все кастомные солверы
+```text
+tsp-cpp/
+  include/
+    json.hpp
 
-### Создание нового солвера
+  src/
+    main.cpp
 
-- Новый солвер следует разместить в папке `src/solvers`
-- Солвер должен являться наследником класса `Solver`, он должен переопределить методы `Solve` и `Configure`
-- Метод `Configure` позволяет настраивать параметры солвера через переданные аргументы командной строки
-- Для доступа к графу следует использовать интерфейс синглтона `Instance`
-- Для использования солвера следует зарегистрировать его в классе `SolverFactory` через `SolverFactory::RegisterSolver`, далее можно использовать через `SolverFactory::Create` или же создавая экземпляры напрямую (для большей гибкости)
-- Возможно последовательное применение нескольких солверов. В этом случае результат одного солвера будет инпутом для следующего. Для этого нужно указать несколько аргументов `--step` и соответствующие аргументы далее, которые будут переданы в `Configure`
+    tsp/
+      instance.h / instance.cpp
+      solver.h
+      factory.h
+      progress.h
+      stop_condition.h / stop_condition.cpp
+      best_store.h
+      tsp_runner.h / tsp_runner.cpp
+      solvers/
+        nearest_neighbour.cpp
+        two_opt.cpp
+        ils.cpp
+        gls.cpp
+        lkh.cpp
 
-### Компиляция
-- Проект поддерживает автоматическую компиляцию при обнаружении изменения любого соответствующего файла
-- Проект создает каталог `build` и считает `build/src/tsp` исполняемым файлом по умолчанию
+    mdmtsp_minmax/
+      mdmtsp_instance.h / mdmtsp_instance.cpp
+      mdmtsp_solution.h
+      mdmtsp_solver_api.h
+      mdmtsp_objective.h
+      mdmtsp_runner.h / mdmtsp_runner.cpp
+      solvers/
+        greedy_seed.cpp
+        vns_anytime.cpp
+        relocate_local_search.cpp
 
-### Запуск солвера
-Запуск следует производить, находясь в папке tsp-cpp
-```bash
-python3 run.py --task path/to/task --coords path/to/dataset --step solver1_name [--arg1 val1 --arg2 val2 ...] --step solver2_name [...]
+  python/
+    run.py
+    io/formats.py
+    runners/tsp_runner.py
+    runners/mdmtsp_runner.py
 ```
 
-Например: 
+## TSP anytime / checkpoint
+
+Поддерживаются:
+- `--run-time-limit <sec>`
+- `--history-file <path.jsonl>`
+- `--checkpoint-file <path.json>`
+- `--checkpoint-every-sec <sec>`
+
+Пример:
 ```bash
-python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step nearest --start 10
+python3 run.py \
+  --problem tsp \
+  --task tasks/task_001.txt \
+  --step ils --time 300 \
+  --run-time-limit 300 \
+  --history-file artifacts/tsp_history.jsonl \
+  --checkpoint-file artifacts/tsp_best.json
 ```
 
-### Вывод:
-- Проверяет структуру (корректность гамильтонова цикла)
-- Выводит длину (км), время работы алгоритма (сек) и первые узлы маршрута
-- Сохраняет решение в tasks/{task_filename}_solution.txt
+## Форматы TSP
 
+### TXT (обратная совместимость)
+- строка 1: `n_nodes`
+- строка 2: ids узлов
+- координаты берутся из `--coords`
 
-### LKH Lib
-
-Использование: 
-```bash
-python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --time_limit 10
+### JSON coords
+```json
+{
+  "problem": "tsp",
+  "format": "coords",
+  "metric": "euclidean",
+  "coords": [[x1, x2, ...], [y1, y2, ...]]
+}
 ```
 
-`TODO: fix in task_003` 
+### JSON matrix
+```json
+{
+  "problem": "tsp",
+  "format": "matrix",
+  "matrix": [[0, 1.2], [1.2, 0]]
+}
+```
+
+## mdmtsp_minmax
+
+Поддержаны baseline solver'ы:
+- `--step greedy_seed`
+- `--step random --iters 100 --seed 42`
+
+### Про депо и агентов
+- `depots`: массив depot-вершин (k депо)
+- `depot_vehicle_limits`: классический вариант `m_i` агентов для каждого депо
+- `k_vehicles`: суммарное число агентов (если `depot_vehicle_limits` не задан)
+
+`depot_vehicle_limits` имеет приоритет. Если задан только `k_vehicles`, выполняется round-robin распределение по депо.
+
+### JSON пример на 5 вершинах и 2 депо
+Файл: `tasks/md_example_5_nodes.json`
+
+```json
+{
+  "problem": "mdmtsp_minmax",
+  "format": "matrix",
+  "matrix": [
+    [0, 7, 3, 8, 6],
+    [7, 0, 6, 4, 5],
+    [3, 6, 0, 5, 7],
+    [8, 4, 5, 0, 3],
+    [6, 5, 7, 3, 0]
+  ],
+  "depots": [0, 1],
+  "depot_vehicle_limits": [2, 1]
+}
+```
+
+Запуск:
+```bash
+python3 run.py --problem mdmtsp_minmax --task tasks/md_example_5_nodes.json --step greedy_seed
+python3 run.py --problem mdmtsp_minmax --task tasks/md_example_5_nodes.json --step random --iters 100
+```

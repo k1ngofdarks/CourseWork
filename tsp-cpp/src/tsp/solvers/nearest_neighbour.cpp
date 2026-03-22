@@ -1,17 +1,21 @@
-#include <solver.h>
-#include <factory.h>
+#include "tsp/solver.h"
+#include "tsp/factory.h"
 #include <random>
 #include <algorithm>
+#include "tsp/instance.h"
 
 namespace tsp {
 
     class GreedyNearest : public Solver {
     public:
         int start = 0;
+        SolverCallbacks callbacks;
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.count("start")) start = std::stoi(opts.at("start"));
         }
+
+        void SetCallbacks(const SolverCallbacks &cb) override { callbacks = cb; }
 
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
@@ -38,6 +42,7 @@ namespace tsp {
                 cur = best;
             }
             route.push_back(route[0]);
+            if (callbacks.on_progress) callbacks.on_progress(route, n);
         }
     };
 

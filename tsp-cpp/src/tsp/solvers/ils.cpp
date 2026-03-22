@@ -1,8 +1,9 @@
-#include <solver.h>
-#include <factory.h>
+#include "tsp/solver.h"
+#include "tsp/factory.h"
 #include <random>
 #include <chrono>
 #include <exception>
+#include "tsp/instance.h"
 
 namespace tsp {
     class ILS : public Solver { // NOLINT
@@ -11,6 +12,7 @@ namespace tsp {
         uint64_t cnt_pert = 1;
         size_t max_iter = 0;
         std::mt19937 rnd;
+        SolverCallbacks callbacks;
 
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
@@ -28,6 +30,8 @@ namespace tsp {
             }
         }
 
+        void SetCallbacks(const SolverCallbacks &cb) override { callbacks = cb; }
+
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
@@ -35,16 +39,19 @@ namespace tsp {
             auto nearest = tsp::SolverFactory::Create("nearest");
             auto opt_2 = tsp::SolverFactory::CreateConfigured("2-opt",
                                                               {std::make_pair("time", std::to_string(time_limit))});
+            opt_2->SetCallbacks(callbacks);
             nearest->Solve(route);
             opt_2->Solve(route);
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
+                if (callbacks.should_stop && callbacks.should_stop()) break;
                 std::vector<int> new_route = route;
                 KDoubleBridgeMove(new_route, cnt_pert);
 
                 opt_2->Solve(new_route);
                 if (inst.RouteLength(new_route) <= inst.RouteLength(route)) {
                     route = new_route;
+                    if (callbacks.on_progress) callbacks.on_progress(route, iter_id + 1);
                 }
             }
         }
