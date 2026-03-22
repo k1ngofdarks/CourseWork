@@ -5,7 +5,7 @@ Runner для тестирования cpp солверов
 
 - Каталог `python` отвечает за скрипты на языке `python`
 - Каталоги `icnlude` и `src` за header и source файлы
-- Подкаталог `src/solvers` отвечает за все кастомные солверы
+- Подкаталог `src/solvers` отвечает за все кастомные солверы: `src/solvers/tsp` и `src/solvers/mdmtsp_minmax`
 
 ### Создание нового солвера
 

@@ -1,6 +1,6 @@
-#include <mdmtsp_minmax_solver.h>
-#include <mdmtsp_minmax_factory.h>
-#include <mdmtsp_minmax_instance.h>
+#include <solver.h>
+#include <factory.h>
+#include <instance.h>
 
 #include <algorithm>
 #include <limits>

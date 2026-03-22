@@ -1,8 +1,6 @@
 #include <factory.h>
 #include <solver.h>
-#include <mdmtsp_minmax_factory.h>
-#include <mdmtsp_minmax_solver.h>
-#include <mdmtsp_minmax_instance.h>
+#include <instance.h>
 
 #include <chrono>
 #include <iostream>

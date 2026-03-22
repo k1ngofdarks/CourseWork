@@ -1,4 +1,4 @@
-#include <mdmtsp_minmax_instance.h>
+#include <instance.h>
 
 #include <cmath>
 #include <iostream>
