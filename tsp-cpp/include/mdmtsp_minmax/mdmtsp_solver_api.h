@@ -1,7 +1,11 @@
 #pragma once
 
-#include "../core/solver_base.h"
+#include "mdmtsp_instance.h"
+#include "mdmtsp_solution.h"
 
 namespace mdmtsp_minmax {
-using Solver = tsp::core::SolverBase;
-}
+
+Solution SolveGreedySeed(const Instance& inst);
+Solution SolveRandomTemplate(const Instance& inst, int iterations, unsigned seed);
+
+} // namespace mdmtsp_minmax

@@ -45,3 +45,14 @@ def build_tsp_payload(task_path: Path, coords_npz: Path, metric: str) -> Tuple[d
     id_to_coord = load_coords(coords_npz)
     latlon = latlon_for_selected(ids, id_to_coord)
     return {"n": n_nodes, "format": "coords", "coords": latlon.T.tolist(), "metric": metric}, ids
+
+
+def build_mdmtsp_payload(task_path: Path) -> dict:
+    if task_path.suffix.lower() != ".json":
+        raise ValueError("mdmtsp_minmax runner expects JSON task format")
+    task = json.loads(task_path.read_text(encoding="utf-8"))
+    if task.get("problem") != "mdmtsp_minmax":
+        raise ValueError("JSON task must have problem=mdmtsp_minmax")
+    if "depots" not in task or "k_vehicles" not in task:
+        raise ValueError("mdmtsp_minmax task requires depots and k_vehicles")
+    return task

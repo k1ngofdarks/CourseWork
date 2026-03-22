@@ -1,7 +1,6 @@
-# mdmtsp_minmax module scaffold
+# src/mdmtsp_minmax
 
-This directory is reserved for Min-Max Multi-Depot mTSP implementation.
-Planned content:
-- instance/model parser (depots, customers, k vehicles)
-- objective evaluator: minimize maximum route length
-- anytime solvers that report best-so-far progress through shared callbacks/logger
+Min-Max Multi-Depot mTSP:
+- `mdmtsp_instance.cpp` — парсинг JSON задачи и построение/чтение матрицы расстояний.
+- `mdmtsp_runner.cpp` — запуск простых md solver'ов и сериализация результата.
+- `solvers/` — алгоритмы для этой постановки.

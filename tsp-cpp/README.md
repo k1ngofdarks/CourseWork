@@ -117,3 +117,25 @@ python3 run.py \
 
 Подготовлен унифицированный каркас модулей и runner'а (`--problem mdmtsp_minmax`).
 Сейчас это scaffold с ответом `status=not_implemented`, но структура каталогов и API уже разделены под отдельную реализацию.
+
+
+### JSON формат mdmtsp_minmax
+
+```json
+{
+  "problem": "mdmtsp_minmax",
+  "format": "matrix",
+  "matrix": [[0, 10, 4], [10, 0, 7], [4, 7, 0]],
+  "depots": [0],
+  "k_vehicles": 2
+}
+```
+
+Поддерживаемые шаги для `--problem mdmtsp_minmax`:
+- `--step greedy_seed`
+- `--step random --iters 100 --seed 42`
+
+Пример запуска random template:
+```bash
+python3 run.py --problem mdmtsp_minmax --task tasks/md_example.json --step random --iters 100
+```
