@@ -43,6 +43,37 @@ def save_solution(task_path: Path, route_ids: List[int]) -> Path:
     return out_path
 
 
+def save_solution_json(
+    task_path: Path,
+    algorithm: str,
+    cost: float,
+    route_ids: List[int],
+    real_time: float,
+) -> Path:
+    out_path = task_path.with_name(task_path.stem + "_solution.json")
+    out_payload = {
+        "algorithm": algorithm,
+        "cost": cost,
+        "optimal_route": route_ids,
+        "time": real_time,
+    }
+    out_path.write_text(
+        json.dumps(out_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return out_path
+
+
+def detect_algorithm_name(cpp_args: List[str]) -> str:
+    steps: List[str] = []
+    for i, arg in enumerate(cpp_args):
+        if arg == "--step" and i + 1 < len(cpp_args):
+            steps.append(cpp_args[i + 1])
+    if not steps:
+        return "unknown"
+    return " -> ".join(steps)
+
+
 def build_payload_from_txt(task_path: Path, coords_path: Path) -> Tuple[str, int, List[int]]:
     n_nodes, ids = read_task(task_path)
     id_to_coord = load_coords(coords_path)
@@ -124,12 +155,19 @@ def main() -> None:
     # Map back to dataset IDs
     route_ids = [ids[i] for i in route_pos]
     out_path = save_solution(task_path, route_ids)
+    out_json_path = save_solution_json(
+        task_path=task_path,
+        algorithm=detect_algorithm_name(cpp_args),
+        cost=length_km,
+        route_ids=route_ids,
+        real_time=real_time,
+    )
 
     logging.info(f"Valid: {ok} ({msg}) | Length: {length_km:.6f} km | Time: {real_time:.4f} s")
     logging.info(f"Solution saved: {out_path}")
+    logging.info(f"Solution JSON saved: {out_json_path}")
     logging.info(f"Route (first 25 ids): {route_ids[:25]} ...")
 
 
 if __name__ == "__main__":
     main()
-

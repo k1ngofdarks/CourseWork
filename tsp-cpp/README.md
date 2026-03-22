@@ -69,6 +69,11 @@ python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step nearest -
 - Проверяет структуру (корректность гамильтонова цикла)
 - Выводит длину (км), время работы алгоритма (сек) и первые узлы маршрута
 - Сохраняет решение в tasks/{task_filename}_solution.txt
+- Дополнительно сохраняет JSON в `tasks/{task_filename}_solution.json` c полями:
+  - `algorithm` — имя (или цепочка) солвера из `--step`
+  - `cost` — длина маршрута
+  - `optimal_route` — найденный маршрут
+  - `time` — время работы
 
 
 ### LKH Lib
