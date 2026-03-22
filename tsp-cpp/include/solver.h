@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <functional>
 #include <memory>
+#include "progress.h"
 
 namespace tsp {
 
@@ -13,6 +14,7 @@ namespace tsp {
         // Used to pass arguments inside the solver
         virtual void Configure(const std::unordered_map<std::string,std::string>& opts) {}
         virtual void Solve(std::vector<int>& out) = 0;
+        virtual void SetCallbacks(const SolverCallbacks& callbacks) {}
         virtual ~Solver() = default;
     };
 

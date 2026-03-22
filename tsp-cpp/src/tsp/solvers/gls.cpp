@@ -10,6 +10,7 @@ namespace tsp {
         double time_limit = -1;
         size_t max_iter = 0;
         double lambda = 0.2;
+        SolverCallbacks callbacks;
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) {
@@ -26,6 +27,8 @@ namespace tsp {
             }
         }
 
+        void SetCallbacks(const SolverCallbacks &cb) override { callbacks = cb; }
+
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
@@ -37,9 +40,11 @@ namespace tsp {
             std::vector<int> best_route = route;
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
+                if (callbacks.should_stop && callbacks.should_stop()) break;
                 ImprovedTwoOpt(route, penalties);
                 if (inst.RouteLength(route) <= inst.RouteLength(best_route)) {
                     best_route = route;
+                    if (callbacks.on_progress) callbacks.on_progress(best_route, iter_id + 1);
                 }
                 double max_utility = 0;
                 for (size_t i = 0; i < n; i++) {

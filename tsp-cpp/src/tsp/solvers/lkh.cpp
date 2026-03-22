@@ -146,6 +146,10 @@ namespace tsp {
         }
         
     public:
+        SolverCallbacks callbacks;
+
+        void SetCallbacks(const SolverCallbacks &cb) override { callbacks = cb; }
+
         void Configure(const std::unordered_map<std::string, std::string>& opts) override {
             if (opts.count("time_limit")) {
                 time_limit = std::stod(opts.at("time_limit"));
@@ -194,6 +198,7 @@ namespace tsp {
                 std::cerr << "LKH Solver error: " << e.what() << ", keeping original tour\n";
             }
             
+            if (callbacks.on_progress) callbacks.on_progress(route, 1);
             CleanupFiles(temp_files);
         }
     };
