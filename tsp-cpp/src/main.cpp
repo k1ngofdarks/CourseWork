@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "core/stop_condition.h"
+#include "tsp/stop_condition.h"
 #include "tsp/tsp_runner.h"
 #include "mdmtsp_minmax/mdmtsp_runner.h"
 
@@ -54,7 +54,7 @@ inline ParsedArgs ParseArguments(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    tsp::core::StopCondition::InstallSignalHandlers();
+    tsp::StopCondition::InstallSignalHandlers();
     auto parsed = ParseArguments(argc, argv);
 
     if (parsed.problem_type == "mdmtsp_minmax") {

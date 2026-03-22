@@ -1,7 +1,8 @@
-#include <solver.h>
-#include <factory.h>
+#include "tsp/solver.h"
+#include "tsp/factory.h"
 #include <random>
 #include <algorithm>
+#include "tsp/instance.h"
 
 namespace tsp {
 

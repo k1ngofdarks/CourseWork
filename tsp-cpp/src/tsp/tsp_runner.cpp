@@ -1,15 +1,15 @@
 #include "tsp/tsp_runner.h"
 
-#include <factory.h>
-#include <instance.h>
+#include "tsp/factory.h"
+#include "tsp/instance.h"
 #include <numeric>
 #include <fstream>
 #include <optional>
 #include <chrono>
 #include <cstdio>
 #include <json.hpp>
-#include "core/best_store.h"
-#include "core/stop_condition.h"
+#include "tsp/best_store.h"
+#include "tsp/stop_condition.h"
 
 namespace tsp {
 namespace {
@@ -44,7 +44,7 @@ public:
         }
     }
 
-    [[nodiscard]] const core::BestStore& Best() const { return best_; }
+    [[nodiscard]] const BestStore& Best() const { return best_; }
 
 private:
     static double Elapsed(const std::chrono::high_resolution_clock::time_point& start) {
@@ -85,13 +85,13 @@ private:
     std::string checkpoint_path_;
     double save_every_sec_ = 30.0;
     double last_checkpoint_flush_sec_ = 0.0;
-    core::BestStore best_;
+    BestStore best_;
 };
 
 } // namespace
 
 std::string RunTsp(const RunnerInput& input) {
-    std::vector<std::pair<std::string, std::unique_ptr<tsp::core::SolverBase>>> solvers;
+    std::vector<std::pair<std::string, std::unique_ptr<Solver>>> solvers;
     for (const auto& step : input.steps) {
         auto solver = SolverFactory::Create(step.name);
         solver->Configure(step.args);
@@ -114,7 +114,7 @@ std::string RunTsp(const RunnerInput& input) {
     RunLogger logger(history_file, checkpoint_file, checkpoint_every);
     auto start = std::chrono::high_resolution_clock::now();
 
-    core::StopCondition stop(run_time_limit);
+    StopCondition stop(run_time_limit);
 
     std::size_t global_iter = 0;
     for (auto& [solver_name, solver] : solvers) {
@@ -143,7 +143,7 @@ std::string RunTsp(const RunnerInput& input) {
     out["best_found_time"] = logger.Best().HasValue() ? logger.Best().TimeSec() : real_time;
     out["best_iter"] = logger.Best().HasValue() ? logger.Best().Iter() : 0;
     out["best_solver"] = logger.Best().HasValue() ? logger.Best().Algorithm() : "";
-    out["stopped_by_signal"] = core::StopCondition::IsSignalStopRequested();
+    out["stopped_by_signal"] = StopCondition::IsSignalStopRequested();
     return out.dump();
 }
 

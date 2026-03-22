@@ -3,12 +3,11 @@
 #include <chrono>
 #include <csignal>
 
-namespace tsp::core {
+namespace tsp {
 
 class StopCondition {
 public:
     explicit StopCondition(double run_time_limit_sec);
-
     bool ShouldStop() const;
 
     static void InstallSignalHandlers();
@@ -19,4 +18,4 @@ private:
     std::chrono::high_resolution_clock::time_point start_;
 };
 
-} // namespace tsp::core
+} // namespace tsp

@@ -4,6 +4,7 @@ list(FILTER LIB_SOURCES EXCLUDE REGEX "main.cpp$")
 add_library(tsp_library OBJECT ${LIB_SOURCES})
 
 target_include_directories(tsp_library PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 

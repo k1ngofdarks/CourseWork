@@ -8,10 +8,8 @@ namespace mdmtsp_minmax {
 struct Instance {
     std::vector<std::vector<double>> dist;
     std::vector<int> depots;
-
-    // Effective vehicle assignment per depot index in `depots`.
     std::vector<int> depot_vehicle_limits;
-    int k_vehicles = 0; // total vehicles (sum(depot_vehicle_limits))
+    int k_vehicles = 0;
 
     [[nodiscard]] int N() const { return static_cast<int>(dist.size()); }
     [[nodiscard]] std::vector<int> Customers() const;

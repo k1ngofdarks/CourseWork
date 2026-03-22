@@ -1,43 +1,24 @@
-Runner для тестирования solvers (TSP + scaffold для mdmtsp_minmax)
+Runner для TSP и Min-Max Multi-Depot mTSP
 ==============
 
-## Структура проекта
+## Структура (header рядом с C++)
 
 ```text
 tsp-cpp/
   include/
-    core/
-      run_context.h
-      stop_condition.h
-      progress_event.h
-      best_store.h
-      solver_base.h
-      factory.h
-    tsp/
-      tsp_instance.h
-      tsp_solution.h
-      tsp_objective.h
-      tsp_solver_api.h
-      tsp_runner.h
-    mdmtsp_minmax/
-      mdmtsp_instance.h
-      mdmtsp_solution.h
-      mdmtsp_objective.h
-      mdmtsp_solver_api.h
-      mdmtsp_runner.h
+    json.hpp
 
   src/
-    core/
-      runner.cpp
-      stop_condition.cpp
-      progress_logger.cpp
-      checkpoint_writer.cpp
-      factory.cpp
-      best_store.cpp
+    main.cpp
 
     tsp/
-      tsp_runner.cpp
-      instance.cpp
+      instance.h / instance.cpp
+      solver.h
+      factory.h
+      progress.h
+      stop_condition.h / stop_condition.cpp
+      best_store.h
+      tsp_runner.h / tsp_runner.cpp
       solvers/
         nearest_neighbour.cpp
         two_opt.cpp
@@ -46,31 +27,30 @@ tsp-cpp/
         lkh.cpp
 
     mdmtsp_minmax/
-      mdmtsp_runner.cpp
-      mdmtsp_instance.cpp
+      mdmtsp_instance.h / mdmtsp_instance.cpp
+      mdmtsp_solution.h
+      mdmtsp_solver_api.h
+      mdmtsp_objective.h
+      mdmtsp_runner.h / mdmtsp_runner.cpp
       solvers/
         greedy_seed.cpp
-        relocate_local_search.cpp
         vns_anytime.cpp
-
-    main.cpp
+        relocate_local_search.cpp
 
   python/
     run.py
-    runners/
-      tsp_runner.py
-      mdmtsp_runner.py
-    io/
-      formats.py
+    io/formats.py
+    runners/tsp_runner.py
+    runners/mdmtsp_runner.py
 ```
 
-## Anytime / best-so-far логирование
+## TSP anytime / checkpoint
 
 Поддерживаются:
-- `--run-time-limit <sec>`: глобальный лимит времени для всего запуска
-- `--history-file <path.jsonl>`: журнал улучшений (best-so-far history)
-- `--checkpoint-file <path.json>`: периодический checkpoint лучшего решения
-- `--checkpoint-every-sec <sec>`: периодичность сохранения checkpoint (по умолчанию 30)
+- `--run-time-limit <sec>`
+- `--history-file <path.jsonl>`
+- `--checkpoint-file <path.json>`
+- `--checkpoint-every-sec <sec>`
 
 Пример:
 ```bash
@@ -80,71 +60,69 @@ python3 run.py \
   --step ils --time 300 \
   --run-time-limit 300 \
   --history-file artifacts/tsp_history.jsonl \
-  --checkpoint-file artifacts/tsp_best.json \
-  --checkpoint-every-sec 30
+  --checkpoint-file artifacts/tsp_best.json
 ```
 
-Если процесс остановить `SIGINT/SIGTERM`, раннер сохраняет последнее best-so-far в checkpoint.
+## Форматы TSP
 
-## Форматы задач TSP
-
-### 1) TXT формат (обратная совместимость)
+### TXT (обратная совместимость)
 - строка 1: `n_nodes`
-- строка 2: список id узлов
-- координаты берутся из NPZ (`--coords`)
+- строка 2: ids узлов
+- координаты берутся из `--coords`
 
-### 2) JSON coords формат
+### JSON coords
 ```json
 {
   "problem": "tsp",
   "format": "coords",
-  "metric": "haversine",
+  "metric": "euclidean",
   "coords": [[x1, x2, ...], [y1, y2, ...]]
 }
 ```
-`metric`: `haversine` или `euclidean`.
 
-### 3) JSON matrix формат
+### JSON matrix
 ```json
 {
   "problem": "tsp",
   "format": "matrix",
-  "matrix": [[0, 1.2, ...], [1.2, 0, ...], ...]
+  "matrix": [[0, 1.2], [1.2, 0]]
 }
 ```
 
 ## mdmtsp_minmax
 
-Поддержаны два простых baseline solver'а:
-- `greedy_seed`
-- `random` (template: случайные раскладки, по умолчанию 100 итераций)
+Поддержаны baseline solver'ы:
+- `--step greedy_seed`
+- `--step random --iters 100 --seed 42`
 
-### Что такое `k_vehicles` и `depot_vehicle_limits`
-- `depots` — массив depot-вершин (их может быть k штук).
-- `k_vehicles` — **общее** число агентов (суммарно по всем depot).
-- `depot_vehicle_limits` — явное распределение агентов по depot (классический вариант с `m_i`).
+### Про депо и агентов
+- `depots`: массив depot-вершин (k депо)
+- `depot_vehicle_limits`: классический вариант `m_i` агентов для каждого депо
+- `k_vehicles`: суммарное число агентов (если `depot_vehicle_limits` не задан)
 
-Если задан только `k_vehicles`, раннер распределяет агентов по depot равномерно round-robin.
-Если задан `depot_vehicle_limits`, он имеет приоритет и задает точные `m_i` по depot.
+`depot_vehicle_limits` имеет приоритет. Если задан только `k_vehicles`, выполняется round-robin распределение по депо.
 
-### JSON формат mdmtsp_minmax
+### JSON пример на 5 вершинах и 2 депо
+Файл: `tasks/md_example_5_nodes.json`
 
 ```json
 {
   "problem": "mdmtsp_minmax",
   "format": "matrix",
-  "matrix": [[0, 10, 4], [10, 0, 7], [4, 7, 0]],
-  "depots": [0],
-  "k_vehicles": 2,
-  "depot_vehicle_limits": [1]
+  "matrix": [
+    [0, 7, 3, 8, 6],
+    [7, 0, 6, 4, 5],
+    [3, 6, 0, 5, 7],
+    [8, 4, 5, 0, 3],
+    [6, 5, 7, 3, 0]
+  ],
+  "depots": [0, 1],
+  "depot_vehicle_limits": [2, 1]
 }
 ```
 
-Поддерживаемые шаги для `--problem mdmtsp_minmax`:
-- `--step greedy_seed`
-- `--step random --iters 100 --seed 42`
-
-Пример запуска random template:
+Запуск:
 ```bash
-python3 run.py --problem mdmtsp_minmax --task tasks/md_example.json --step random --iters 100
+python3 run.py --problem mdmtsp_minmax --task tasks/md_example_5_nodes.json --step greedy_seed
+python3 run.py --problem mdmtsp_minmax --task tasks/md_example_5_nodes.json --step random --iters 100
 ```

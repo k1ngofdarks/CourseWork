@@ -5,12 +5,22 @@
 #include <optional>
 #include <limits>
 
-namespace tsp::core {
+namespace tsp {
 
 class BestStore {
 public:
     bool TryUpdate(const std::vector<int>& route, double objective, double time_sec, std::size_t iter,
-                   const std::string& algorithm);
+                   const std::string& algorithm) {
+        if (!route_.has_value() || objective + 1e-9 < objective_) {
+            route_ = route;
+            objective_ = objective;
+            time_sec_ = time_sec;
+            iter_ = iter;
+            algorithm_ = algorithm;
+            return true;
+        }
+        return false;
+    }
 
     [[nodiscard]] bool HasValue() const { return route_.has_value(); }
     [[nodiscard]] const std::vector<int>& Route() const { return route_.value(); }
@@ -27,4 +37,4 @@ private:
     std::string algorithm_;
 };
 
-} // namespace tsp::core
+} // namespace tsp

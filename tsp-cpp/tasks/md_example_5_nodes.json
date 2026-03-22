@@ -1,0 +1,13 @@
+{
+  "problem": "mdmtsp_minmax",
+  "format": "matrix",
+  "matrix": [
+    [0, 7, 3, 8, 6],
+    [7, 0, 6, 4, 5],
+    [3, 6, 0, 5, 7],
+    [8, 4, 5, 0, 3],
+    [6, 5, 7, 3, 0]
+  ],
+  "depots": [0, 1],
+  "depot_vehicle_limits": [2, 1]
+}

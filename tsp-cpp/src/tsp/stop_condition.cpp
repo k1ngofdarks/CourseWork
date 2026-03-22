@@ -1,12 +1,10 @@
-#include "core/stop_condition.h"
+#include "tsp/stop_condition.h"
 
-namespace tsp::core {
+namespace tsp {
 
 volatile std::sig_atomic_t g_stop_signal = 0;
 
-void HandleSignal(int) {
-    g_stop_signal = 1;
-}
+void HandleSignal(int) { g_stop_signal = 1; }
 
 StopCondition::StopCondition(double run_time_limit_sec)
     : run_time_limit_sec_(run_time_limit_sec), start_(std::chrono::high_resolution_clock::now()) {}
@@ -24,8 +22,6 @@ void StopCondition::InstallSignalHandlers() {
     std::signal(SIGTERM, HandleSignal);
 }
 
-bool StopCondition::IsSignalStopRequested() {
-    return g_stop_signal != 0;
-}
+bool StopCondition::IsSignalStopRequested() { return g_stop_signal != 0; }
 
-} // namespace tsp::core
+} // namespace tsp

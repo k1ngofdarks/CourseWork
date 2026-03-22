@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "../tsp/tsp_runner.h"
+#include "tsp/tsp_runner.h"
 
 namespace mdmtsp_minmax {
 

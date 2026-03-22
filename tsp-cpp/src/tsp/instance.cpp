@@ -1,4 +1,4 @@
-#include <instance.h>
+#include "tsp/instance.h"
 #include <sstream>
 #include <iostream>
 #include <cmath>

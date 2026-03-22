@@ -1,6 +1,6 @@
-#include <solver.h>
-#include <factory.h>
-#include <instance.h>
+#include "tsp/solver.h"
+#include "tsp/factory.h"
+#include "tsp/instance.h"
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
