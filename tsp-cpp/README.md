@@ -5,7 +5,7 @@ Runner для тестирования cpp солверов
 
 - Каталог `python` отвечает за скрипты на языке `python`
 - Каталоги `icnlude` и `src` за header и source файлы
-- Подкаталог `src/solvers` отвечает за все кастомные солверы
+- Подкаталог `src/solvers` отвечает за все кастомные солверы: `src/solvers/tsp` и `src/solvers/mdmtsp_minmax`
 
 ### Создание нового солвера
 
@@ -84,3 +84,37 @@ python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --tim
 ```
 
 `TODO: fix in task_003` 
+
+
+### MDMTSP Min-Max
+
+Для запуска режима MDMTSP Min-Max в JSON задаче нужно указать:
+- `problem: "mdmtsp_minmax"`
+- `depots`: список депо (индексы вершин, допустимы повторы, длина списка = число маршрутов)
+
+Поддерживаются те же 3 формата входа (`ids`+`coords`, `matrix`, `coordinates`+`metric`).
+
+Пример:
+
+```json
+{
+  "problem": "mdmtsp_minmax",
+  "coordinates": [[0,0],[2,0],[4,0],[0,2],[2,2],[4,2]],
+  "metric": "euclidean",
+  "depots": [0, 3, 3]
+}
+```
+
+Запуск random-солвера:
+
+```bash
+python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 1000
+```
+
+Поля выходного JSON для MDMTSP:
+- `problem` = `mdmtsp_minmax`
+- `algorithm`
+- `max_cost` — минимизированный максимум по длинам маршрутов
+- `route_costs` — длина каждого маршрута
+- `routes` — список маршрутов (в id исходных данных)
+- `time`
