@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
+
 def is_valid_tour(route: List[int], n: int) -> bool:
     if not route or len(route) != n + 1:
         return False
@@ -28,3 +29,30 @@ def validate_tour(route: List[int], n: int) -> Tuple[bool, str]:
     return True, "OK"
 
 
+def validate_mdmtsp_routes(routes: List[List[int]], n: int, depots: List[int]) -> Tuple[bool, str]:
+    if not routes:
+        return False, "Empty routes"
+    if len(routes) != len(depots):
+        return False, "Routes count should match depots count"
+
+    depot_set = set(depots)
+    seen_customers = []
+
+    for idx, route in enumerate(routes):
+        if len(route) < 2:
+            return False, f"Route {idx} is too short"
+        if route[0] != depots[idx] or route[-1] != depots[idx]:
+            return False, f"Route {idx} should start/end at its depot"
+        for v in route:
+            if v < 0 or v >= n:
+                return False, f"Node index {v} out of bounds in route {idx}"
+        for v in route[1:-1]:
+            if v in depot_set:
+                return False, f"Depot {v} found inside route {idx}"
+            seen_customers.append(v)
+
+    expected_customers = [v for v in range(n) if v not in depot_set]
+    if sorted(seen_customers) != sorted(expected_customers):
+        return False, "Customers must be visited exactly once across all routes"
+
+    return True, "OK"

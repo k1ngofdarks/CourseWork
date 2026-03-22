@@ -1,0 +1,6 @@
+{
+  "problem": "mdmtsp_minmax",
+  "coordinates": [[0.0, 0.0], [2.0, 0.0], [4.0, 0.0], [0.0, 2.0], [2.0, 2.0], [4.0, 2.0]],
+  "metric": "euclidean",
+  "depots": [0, 3, 3]
+}
