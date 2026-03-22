@@ -2,7 +2,7 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
-#include "../include/json.hpp"
+#include <json.hpp>
 
 namespace tsp {
     inline std::string ReadAllStdin() {

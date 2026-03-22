@@ -1,23 +1,11 @@
 #pragma once
-#include "instance.h"
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <functional>
-#include <memory>
+
+#include "core/solver_base.h"
 #include "progress.h"
+#include "instance.h"
 
 namespace tsp {
-
-    class Solver {
-    public:
-        // Used to pass arguments inside the solver
-        virtual void Configure(const std::unordered_map<std::string,std::string>& opts) {}
-        virtual void Solve(std::vector<int>& out) = 0;
-        virtual void SetCallbacks(const SolverCallbacks& callbacks) {}
-        virtual ~Solver() = default;
-    };
-
-    using SolverCreator = std::function<std::unique_ptr<Solver>()>;
-
+using Solver = core::SolverBase;
+using SolverCreator = core::SolverCreator;
+using SolverCallbacks = core::RunCallbacks;
 } // namespace tsp

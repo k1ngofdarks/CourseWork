@@ -1,29 +1,70 @@
-Runner для тестирования cpp солверов
+Runner для тестирования solvers (TSP + scaffold для mdmtsp_minmax)
 ==============
 
-### Структура проекта
+## Структура проекта
 
-- Каталог `python` отвечает за скрипты на языке `python`
-- Каталоги `include` и `src` за header и source файлы
-- Подкаталог `src/tsp/solvers` отвечает за все кастомные TSP солверы
+```text
+tsp-cpp/
+  include/
+    core/
+      run_context.h
+      stop_condition.h
+      progress_event.h
+      best_store.h
+      solver_base.h
+      factory.h
+    tsp/
+      tsp_instance.h
+      tsp_solution.h
+      tsp_objective.h
+      tsp_solver_api.h
+      tsp_runner.h
+    mdmtsp_minmax/
+      mdmtsp_instance.h
+      mdmtsp_solution.h
+      mdmtsp_objective.h
+      mdmtsp_solver_api.h
+      mdmtsp_runner.h
 
-### Создание нового солвера
+  src/
+    core/
+      runner.cpp
+      stop_condition.cpp
+      progress_logger.cpp
+      checkpoint_writer.cpp
+      factory.cpp
+      best_store.cpp
 
-- Новый солвер следует разместить в папке `src/tsp/solvers`
-- Солвер должен являться наследником класса `Solver`, он должен переопределить методы `Solve` и `Configure`
-- Метод `Configure` позволяет настраивать параметры солвера через переданные аргументы командной строки
-- Для доступа к графу следует использовать интерфейс синглтона `Instance`
-- Для использования солвера следует зарегистрировать его в классе `SolverFactory` через `SolverFactory::RegisterSolver`
-- Возможно последовательное применение нескольких солверов через аргументы `--step`
+    tsp/
+      tsp_runner.cpp
+      instance.cpp
+      solvers/
+        nearest_neighbour.cpp
+        two_opt.cpp
+        ils.cpp
+        gls.cpp
+        lkh.cpp
 
-### Запуск солвера
+    mdmtsp_minmax/
+      mdmtsp_runner.cpp
+      mdmtsp_instance.cpp
+      solvers/
+        greedy_seed.cpp
+        relocate_local_search.cpp
+        vns_anytime.cpp
 
-Запуск следует производить, находясь в папке tsp-cpp
-```bash
-python3 run.py --task path/to/task --coords path/to/dataset --step solver1_name [--arg1 val1] --step solver2_name [...]
+    main.cpp
+
+  python/
+    run.py
+    runners/
+      tsp_runner.py
+      mdmtsp_runner.py
+    io/
+      formats.py
 ```
 
-### Anytime / best-so-far логирование
+## Anytime / best-so-far логирование
 
 Поддерживаются:
 - `--run-time-limit <sec>`: глобальный лимит времени для всего запуска
@@ -34,6 +75,7 @@ python3 run.py --task path/to/task --coords path/to/dataset --step solver1_name 
 Пример:
 ```bash
 python3 run.py \
+  --problem tsp \
   --task tasks/task_001.txt \
   --step ils --time 300 \
   --run-time-limit 300 \
@@ -42,16 +84,16 @@ python3 run.py \
   --checkpoint-every-sec 30
 ```
 
-Если процесс остановить `SIGINT/SIGTERM`, раннер сохранит последнее best-so-far в checkpoint.
+Если процесс остановить `SIGINT/SIGTERM`, раннер сохраняет последнее best-so-far в checkpoint.
 
-### Форматы задач TSP
+## Форматы задач TSP
 
-#### 1) Текущий TXT формат (обратная совместимость)
+### 1) TXT формат (обратная совместимость)
 - строка 1: `n_nodes`
 - строка 2: список id узлов
 - координаты берутся из NPZ (`--coords`)
 
-#### 2) JSON coords формат
+### 2) JSON coords формат
 ```json
 {
   "problem": "tsp",
@@ -62,7 +104,7 @@ python3 run.py \
 ```
 `metric`: `haversine` или `euclidean`.
 
-#### 3) JSON matrix формат
+### 3) JSON matrix формат
 ```json
 {
   "problem": "tsp",
@@ -71,24 +113,7 @@ python3 run.py \
 }
 ```
 
-### Рекомендуемый формат для будущего mdmtsp_minmax
+## mdmtsp_minmax
 
-(Схема для унификации, пока без отдельного исполняемого mdmtsp раннера)
-```json
-{
-  "problem": "mdmtsp_minmax",
-  "format": "coords",
-  "metric": "euclidean",
-  "coords": [[x...], [y...]],
-  "depots": [0, 7, 11],
-  "k_vehicles": 6,
-  "depot_vehicle_limits": {"0": 2, "7": 2, "11": 2}
-}
-```
-
-### LKH Lib
-
-Использование:
-```bash
-python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --time_limit 10
-```
+Подготовлен унифицированный каркас модулей и runner'а (`--problem mdmtsp_minmax`).
+Сейчас это scaffold с ответом `status=not_implemented`, но структура каталогов и API уже разделены под отдельную реализацию.
