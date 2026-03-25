@@ -32,6 +32,7 @@ namespace app {
         void AddInfo(const std::string &message);
         void AddDebug(const std::string &message);
         void AddNewSolution(const std::string &source, double objective_value);
+        void AddNewSolution(const std::string &source, double objective_value, const std::string &route_snapshot);
 
         void Shutdown();
 
@@ -43,11 +44,13 @@ namespace app {
             std::string timestamp;
             std::string source;
             double objective_value;
+            std::string route_snapshot;
         };
 
         void WorkerLoop();
         void FlushSnapshotLocked();
         static std::string NowString();
+        double ElapsedSecondsLocked() const;
 
         std::mutex mtx;
         std::ofstream file;
@@ -62,6 +65,13 @@ namespace app {
         std::vector<std::string> debug_events;
         std::vector<ImprovementPoint> improvements;
         std::optional<double> best_objective;
+        std::string latest_route_snapshot;
+        std::string best_route_snapshot;
+        std::string task_type;
+        std::string task_name;
+        std::string started_at;
+        std::chrono::steady_clock::time_point started_monotonic;
+        size_t snapshot_index = 0;
     };
 
 } // namespace app

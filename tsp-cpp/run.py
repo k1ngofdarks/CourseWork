@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -177,12 +178,35 @@ def ensure_key_arg(cpp_args: List[str], key: str, value: str) -> List[str]:
     return [flag, value] + cpp_args
 
 
+def configure_python_logger(log_mode: str) -> None:
+    level = logging.DEBUG if log_mode == "debug" else logging.INFO
+    logging.basicConfig(level=level, format="%(message)s")
+
+
+def summarize_route(route_ids: List[int], limit: int = 10) -> str:
+    preview = route_ids[:limit]
+    suffix = " ..." if len(route_ids) > limit else ""
+    return f"{preview}{suffix}"
+
+
+def summarize_routes(routes_ids: List[List[int]], limit_routes: int = 3, limit_nodes: int = 6) -> str:
+    chunks = []
+    for idx, route in enumerate(routes_ids[:limit_routes], start=1):
+        preview = route[:limit_nodes]
+        suffix = " ..." if len(route) > limit_nodes else ""
+        chunks.append(f"r{idx}={preview}{suffix}")
+    if len(routes_ids) > limit_routes:
+        chunks.append("...")
+    return " | ".join(chunks)
+
+
 def main() -> None:
     args, cpp_args = parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    configure_python_logger(args.log_mode)
 
     task_path = Path(args.task)
     coords_npz = Path(args.coords)
+    started_at = datetime.now().astimezone()
 
     num_runs = 1
     task_json = None
@@ -200,6 +224,14 @@ def main() -> None:
     best_solution_payload = {}
     best_route_ids = []
 
+    logging.info(
+        "Start run | task=%s | started_at=%s | log_mode=%s",
+        task_path,
+        started_at.strftime("%Y-%m-%d %H:%M:%S %z"),
+        args.log_mode,
+    )
+    logging.debug("Initial CLI args for solver: %s", cpp_args)
+
     for run_idx in range(num_runs):
         if task_json is not None:
             # Парсинг/Генерация вызывается каждую итерацию для обеспечения уникальных данных (координаты/депо)
@@ -215,6 +247,21 @@ def main() -> None:
             recompiles_if_necessary()
             algorithm = detect_algorithm_name(cpp_args)
             cpp_args_prepared = True
+            logging.info(
+                "Prepared solver | problem=%s | algorithm=%s | runs=%d",
+                problem,
+                algorithm,
+                num_runs,
+            )
+            logging.debug("Prepared solver args: %s", cpp_args)
+
+        logging.debug(
+            "Run %d/%d | nodes=%d | depots=%s",
+            run_idx + 1,
+            num_runs,
+            n_nodes,
+            depots if depots else [],
+        )
 
         p = subprocess.run(["build/src/tsp"] + cpp_args, input=payload, text=True, capture_output=True)
         if p.returncode != 0:
@@ -236,6 +283,8 @@ def main() -> None:
             total_time += real_time
 
             logging.info(f"Run {run_idx+1}/{num_runs} | Valid: {ok} | Cost (Max len): {cost:.6f} | Time: {real_time:.4f} s")
+            logging.debug("Run %d validation message: %s", run_idx + 1, msg)
+            logging.debug("Run %d routes preview: %s", run_idx + 1, summarize_routes(routes_ids))
 
             if cost < best_cost:
                 best_cost = cost
@@ -248,6 +297,13 @@ def main() -> None:
                     "depots": depots,
                     "best_run_idx": run_idx + 1
                 }
+                logging.info(
+                    "New best solution | run=%d | max_len=%.6f | route_costs=%s",
+                    run_idx + 1,
+                    max_len,
+                    lens,
+                )
+                logging.debug("Best routes preview: %s", summarize_routes(routes_ids))
         else:
             route_pos = output["route"]
             real_time = output["time"]
@@ -261,6 +317,8 @@ def main() -> None:
             total_time += real_time
 
             logging.info(f"Run {run_idx+1}/{num_runs} | Valid: {ok} | Cost: {cost:.6f} | Time: {real_time:.4f} s")
+            logging.debug("Run %d validation message: %s", run_idx + 1, msg)
+            logging.debug("Run %d route preview: %s", run_idx + 1, summarize_route(route_ids))
 
             if cost < best_cost:
                 best_cost = cost
@@ -272,6 +330,12 @@ def main() -> None:
                     "optimal_route": route_ids,
                     "best_run_idx": run_idx + 1
                 }
+                logging.info(
+                    "New best solution | run=%d | cost=%.6f",
+                    run_idx + 1,
+                    length_km,
+                )
+                logging.debug("Best route preview: %s", summarize_route(route_ids))
 
     # Вычисляем среднее и сохраняем результаты по завершении всех запусков
     avg_cost = total_cost / num_runs
@@ -288,11 +352,17 @@ def main() -> None:
     logging.info(f"Average Cost: {avg_cost:.6f} | Average Time: {avg_time:.4f} s")
     logging.info(f"Best Cost: {best_cost:.6f} (found at run {best_solution_payload.get('best_run_idx')})")
     logging.info(f"Solution JSON saved: {out_json_path}")
+    logging.debug("Best solution payload: %s", json.dumps(best_solution_payload, ensure_ascii=False))
 
     if best_solution_payload.get("problem") != "mdmtsp_minmax":
         out_path = save_solution(task_path, best_route_ids)
         logging.info(f"Solution TXT saved: {out_path}")
         logging.info(f"Best Route (first 25 ids): {best_route_ids[:25]} ...")
+    else:
+        logging.info(
+            "Best routes summary: %s",
+            summarize_routes(best_solution_payload.get("routes", [])),
+        )
 
 
 if __name__ == "__main__":

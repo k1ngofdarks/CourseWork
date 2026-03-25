@@ -68,6 +68,16 @@ inline double CalculateMaxRouteLength(const std::vector<std::vector<int>> &route
     return best;
 }
 
+inline std::string SerializeRoute(const std::vector<int> &route) {
+    nlohmann::json j = route;
+    return j.dump();
+}
+
+inline std::string SerializeRoutes(const std::vector<std::vector<int>> &routes) {
+    nlohmann::json j = routes;
+    return j.dump();
+}
+
 int main(int argc, char **argv) {
     auto parsed = ParseArguments(argc, argv);
     const std::string task_name = parsed.global_opts.contains("task_name") ? parsed.global_opts["task_name"] : "unknown_task";
@@ -96,7 +106,7 @@ int main(int argc, char **argv) {
             auto &solver = solvers[i];
             solver->Solve(solution);
             const double candidate_len = inst.RouteLength(solution);
-            logger.AddNewSolution("tsp_step_" + std::to_string(i + 1), candidate_len);
+            logger.AddNewSolution("tsp_step_" + std::to_string(i + 1), candidate_len, SerializeRoute(solution));
         }
         auto stop = std::chrono::high_resolution_clock::now();
         double real_time =
@@ -134,7 +144,7 @@ int main(int argc, char **argv) {
             solver->Solve(solution);
             std::vector<double> curr_lens;
             const double curr_max = CalculateMaxRouteLength(solution, curr_lens);
-            logger.AddNewSolution("mdmtsp_step_" + std::to_string(i + 1), curr_max);
+            logger.AddNewSolution("mdmtsp_step_" + std::to_string(i + 1), curr_max, SerializeRoutes(solution));
         }
         auto stop = std::chrono::high_resolution_clock::now();
         double real_time =
