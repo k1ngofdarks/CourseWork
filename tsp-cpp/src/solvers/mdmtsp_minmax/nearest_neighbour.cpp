@@ -15,7 +15,7 @@ namespace mdmtsp_minmax {
 
         void Solve(std::vector<std::vector<int>> &routes) override {
             const auto &inst = Instance::GetInstance();
-            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.nn");
+            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.nn", -1.0, true, debug_logging_enabled_);
             const auto &depots = inst.GetDepots();
             auto customers = inst.GetCustomers();
 

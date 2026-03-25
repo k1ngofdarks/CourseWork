@@ -30,11 +30,12 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
-            SolverLogScope log_scope(logger_, stop_token_, "gls");
+            SolverLogScope log_scope(logger_, stop_token_, "gls", -1.0, true, debug_logging_enabled_);
 
             auto nearest = tsp::SolverFactory::Create("nearest");
             nearest->SetLogger(logger_);
             nearest->SetStopToken(stop_token_);
+            nearest->SetDebugLoggingEnabled(false);
             nearest->Solve(route);
             int n = static_cast<int>(route.size()) - 1;
             std::vector<std::vector<int>> penalties(n, std::vector<int>(n, 0));

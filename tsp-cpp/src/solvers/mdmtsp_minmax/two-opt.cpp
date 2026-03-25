@@ -20,7 +20,7 @@ namespace mdmtsp_minmax {
 
         void Solve(std::vector<std::vector<int>> &routes) override {
             const auto &inst = Instance::GetInstance();
-            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.two-opt");
+            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.two-opt", -1.0, true, debug_logging_enabled_);
             auto start = std::chrono::high_resolution_clock::now();
             auto report_routes = [&]() {
                 double best = 0;

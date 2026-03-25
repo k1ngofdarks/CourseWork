@@ -17,7 +17,7 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
-            SolverLogScope log_scope(logger_, stop_token_, "nearest");
+            SolverLogScope log_scope(logger_, stop_token_, "nearest", -1.0, true, debug_logging_enabled_);
             std::vector<int> old_route = route;
             route.clear();
             route.reserve(n + 1);

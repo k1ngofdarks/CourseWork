@@ -32,15 +32,17 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
-            SolverLogScope log_scope(logger_, stop_token_, "ils");
+            SolverLogScope log_scope(logger_, stop_token_, "ils", -1.0, true, debug_logging_enabled_);
 
             auto nearest = tsp::SolverFactory::Create("nearest");
             auto opt_2 = tsp::SolverFactory::CreateConfigured("2-opt",
                                                               {std::make_pair("time", std::to_string(time_limit))});
             nearest->SetLogger(logger_);
             nearest->SetStopToken(stop_token_);
+            nearest->SetDebugLoggingEnabled(false);
             opt_2->SetLogger(logger_);
             opt_2->SetStopToken(stop_token_);
+            opt_2->SetDebugLoggingEnabled(false);
             nearest->Solve(route);
             opt_2->Solve(route);
             log_scope.ReportCandidate(route, inst.RouteLength(route));

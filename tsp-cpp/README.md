@@ -144,6 +144,11 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 - `Debug(message)` — строковый debug лог.
 - `DebugValues(a, b, c, ...)` — debug как `printf`-стиль (конкатенация любых значений через stream).
 
+Отдельное управление DEBUG для внутренних алгоритмов:
+- У любого солвера есть `SetDebugLoggingEnabled(bool)` (см. `solver.h`).
+- Это позволяет прокинуть один и тот же logger во внутренние солверы, но отключить именно `DEBUG`-сообщения у них.
+- Пример: в `ils` внутренним `nearest` и `2-opt` выставляется `SetDebugLoggingEnabled(false)`, поэтому они участвуют в общей истории best/periodic, но не шумят debug-логами.
+
 Пример:
 
 ```bash

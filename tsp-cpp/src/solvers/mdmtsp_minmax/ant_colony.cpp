@@ -35,11 +35,13 @@ namespace mdmtsp_minmax {
         void Solve(std::vector<std::vector<int>> &routes) override {
 //            FILE *fp = freopen("/home/nikita/CLionProjects/CourseWork/tsp-cpp/my_logs.txt", "w", stdout);
             const auto &inst = Instance::GetInstance();
-            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.ant");
+            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.ant", -1.0, true, debug_logging_enabled_);
             two_opt_solver->SetLogger(logger_);
             two_opt_solver->SetStopToken(stop_token_);
+            two_opt_solver->SetDebugLoggingEnabled(false);
             nn_solver->SetLogger(logger_);
             nn_solver->SetStopToken(stop_token_);
+            nn_solver->SetDebugLoggingEnabled(false);
             int n = inst.GetN();
             std::vector<int> customers = inst.GetCustomers();
             std::vector<std::vector<int>> result_routes;

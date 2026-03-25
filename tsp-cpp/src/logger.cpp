@@ -55,18 +55,6 @@ void FileLogger::OnImprovement(const std::string &solver_name,
         state.best_length = best_length;
         state.best_found_at_seconds = global_elapsed;
         state.best_route = route;
-        if (config_.debug_enabled) {
-            std::ostringstream ss;
-            ss << "[DEBUG] solver=" << solver_name << " event=improvement best=" << std::fixed
-               << std::setprecision(6) << best_length << " found_at=" << global_elapsed;
-            if (config_.console_enabled) {
-                std::cerr << ss.str() << "\n";
-            }
-            if (!config_.log_file.empty()) {
-                std::ofstream out(config_.log_file, std::ios::out | std::ios::app);
-                out << ss.str() << "\n";
-            }
-        }
     }
 }
 
@@ -139,14 +127,16 @@ SolverLogScope::SolverLogScope(std::shared_ptr<ILogger> logger,
                                std::shared_ptr<IStopToken> stop_token,
                                std::string solver_name,
                                double periodic_interval_seconds,
-                               bool periodic_enabled)
+                               bool periodic_enabled,
+                               bool debug_enabled)
     : logger_(std::move(logger)),
       stop_token_(std::move(stop_token)),
       solver_name_(std::move(solver_name)),
       started_at_(std::chrono::steady_clock::now()),
       last_periodic_log_at_(started_at_),
       periodic_interval_seconds_(periodic_interval_seconds),
-      periodic_enabled_(periodic_enabled) {
+      periodic_enabled_(periodic_enabled),
+      debug_enabled_(debug_enabled) {
     if (!logger_) {
         logger_ = std::make_shared<NullLogger>();
     }
@@ -197,6 +187,9 @@ void SolverLogScope::TickPeriodic(const std::vector<int> &route) {
 }
 
 void SolverLogScope::Debug(const std::string &message) const {
+    if (!debug_enabled_) {
+        return;
+    }
     logger_->Debug(solver_name_, message);
 }
 

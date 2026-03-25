@@ -119,7 +119,8 @@ public:
                    std::shared_ptr<IStopToken> stop_token,
                    std::string solver_name,
                    double periodic_interval_seconds = -1.0,
-                   bool periodic_enabled = true);
+                   bool periodic_enabled = true,
+                   bool debug_enabled = true);
     ~SolverLogScope();
 
     bool StopRequested() const;
@@ -143,6 +144,7 @@ private:
     std::vector<int> best_route_;
     double periodic_interval_seconds_ = 5.0;
     bool periodic_enabled_ = true;
+    bool debug_enabled_ = true;
     bool has_best_ = false;
 };
 

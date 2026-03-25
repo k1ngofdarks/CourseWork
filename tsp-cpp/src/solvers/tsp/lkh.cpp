@@ -161,7 +161,7 @@ namespace tsp {
         }
         
         void Solve(std::vector<int>& route) override {
-            SolverLogScope log_scope(logger_, stop_token_, "lkh");
+            SolverLogScope log_scope(logger_, stop_token_, "lkh", -1.0, true, debug_logging_enabled_);
             if (log_scope.StopRequested()) {
                 log_scope.Debug("stop requested before start");
                 return;

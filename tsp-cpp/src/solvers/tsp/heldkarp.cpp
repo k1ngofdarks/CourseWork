@@ -23,7 +23,7 @@ public:
     void Solve(std::vector<int> &route) override {
         const Instance &inst = Instance::GetInstance();
         const int n = inst.GetN();
-        SolverLogScope log_scope(logger_, stop_token_, "heldkarp");
+        SolverLogScope log_scope(logger_, stop_token_, "heldkarp", -1.0, true, debug_logging_enabled_);
 
         if (n <= 0 || n > max_n) return;
 

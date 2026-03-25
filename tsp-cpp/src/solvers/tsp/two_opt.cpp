@@ -21,7 +21,7 @@ namespace tsp {
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
             auto start = std::chrono::high_resolution_clock::now();
-            SolverLogScope log_scope(logger_, stop_token_, "2-opt");
+            SolverLogScope log_scope(logger_, stop_token_, "2-opt", -1.0, true, debug_logging_enabled_);
             log_scope.ReportCandidate(route, CalculateRouteLength(route));
             bool found_improvement = true;
             while (found_improvement) {
