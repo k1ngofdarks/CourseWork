@@ -85,6 +85,21 @@ python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --tim
 
 `TODO: fix in task_003` 
 
+### Логирование (INFO/DEBUG)
+
+- Логгер встроен в C++ раннер как singleton и поддерживает режимы:
+  - `info` — только базовые события и метрики,
+  - `debug` — дополнительно debug-сообщения.
+- Логгер принимает каждое новое решение через `AddNewSolution` (решение может быть не оптимальным), хранит историю улучшений и текущее лучшее значение целевой функции.
+- Маршрут в лог не пишется (только метрики).
+- Каждые `N` секунд пишется snapshot в файл `logs/{task_type}_{task_name}.log`.
+
+Параметры:
+```bash
+python3 run.py --task ... --log_mode info --log_interval 5 --step nearest
+python3 run.py --task ... --log_mode debug --log_interval 2 --step random --iter 1000
+```
+
 
 ### MDMTSP Min-Max
 

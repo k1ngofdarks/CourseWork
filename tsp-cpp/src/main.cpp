@@ -1,6 +1,7 @@
 #include <factory.h>
 #include <solver.h>
 #include <instance.h>
+#include <logger.h>
 
 #include <chrono>
 #include <iostream>
@@ -11,6 +12,7 @@
 struct ParsedArgs {
     std::string problem = "tsp";
     std::vector<std::pair<std::string, std::unordered_map<std::string, std::string>>> steps;
+    std::unordered_map<std::string, std::string> global_opts;
 };
 
 inline ParsedArgs ParseArguments(int argc, char **argv) {
@@ -35,6 +37,7 @@ inline ParsedArgs ParseArguments(int argc, char **argv) {
             parsed.problem = val;
         } else {
             args[name] = val;
+            parsed.global_opts[name] = val;
         }
     }
     if (!solver_name.empty()) {
@@ -67,12 +70,20 @@ inline double CalculateMaxRouteLength(const std::vector<std::vector<int>> &route
 
 int main(int argc, char **argv) {
     auto parsed = ParseArguments(argc, argv);
+    const std::string task_name = parsed.global_opts.contains("task_name") ? parsed.global_opts["task_name"] : "unknown_task";
+    const std::string log_mode_raw = parsed.global_opts.contains("log_mode") ? parsed.global_opts["log_mode"] : "info";
+    const int log_interval_sec = parsed.global_opts.contains("log_interval") ? std::max(1, std::stoi(parsed.global_opts["log_interval"])) : 5;
+    const auto log_mode = (log_mode_raw == "debug") ? app::Logger::Mode::Debug : app::Logger::Mode::Info;
+    auto &logger = app::Logger::GetInstance();
+    logger.Configure(parsed.problem, task_name, log_mode, log_interval_sec);
+    logger.AddInfo("Start solve. problem=" + parsed.problem + ", steps=" + std::to_string(parsed.steps.size()));
 
     if (parsed.problem == "tsp") {
         std::vector<std::unique_ptr<tsp::Solver>> solvers;
         for (const auto &[name, args]: parsed.steps) {
             solvers.push_back(std::move(tsp::SolverFactory::Create(name)));
             solvers.back()->Configure(args);
+            logger.AddDebug("Configured tsp step=" + name);
         }
         const tsp::Instance &inst = tsp::Instance::GetInstance();
 
@@ -81,8 +92,11 @@ int main(int argc, char **argv) {
         solution.back() = 0;
 
         auto start = std::chrono::high_resolution_clock::now();
-        for (auto &solver: solvers) {
+        for (size_t i = 0; i < solvers.size(); ++i) {
+            auto &solver = solvers[i];
             solver->Solve(solution);
+            const double candidate_len = inst.RouteLength(solution);
+            logger.AddNewSolution("tsp_step_" + std::to_string(i + 1), candidate_len);
         }
         auto stop = std::chrono::high_resolution_clock::now();
         double real_time =
@@ -93,6 +107,8 @@ int main(int argc, char **argv) {
         j["route"] = solution;
         j["time"] = real_time;
         j["len"] = CalculateRouteLength(solution);
+        logger.AddInfo("Finish tsp solve. final_len=" + std::to_string(j["len"].get<double>()));
+        logger.Shutdown();
         std::cout << j.dump();
         return 0;
     }
@@ -102,6 +118,7 @@ int main(int argc, char **argv) {
         for (const auto &[name, args]: parsed.steps) {
             solvers.push_back(std::move(mdmtsp_minmax::SolverFactory::Create(name)));
             solvers.back()->Configure(args);
+            logger.AddDebug("Configured mdmtsp step=" + name);
         }
 
         const auto &inst = mdmtsp_minmax::Instance::GetInstance();
@@ -112,8 +129,12 @@ int main(int argc, char **argv) {
         }
 
         auto start = std::chrono::high_resolution_clock::now();
-        for (auto &solver: solvers) {
+        for (size_t i = 0; i < solvers.size(); ++i) {
+            auto &solver = solvers[i];
             solver->Solve(solution);
+            std::vector<double> curr_lens;
+            const double curr_max = CalculateMaxRouteLength(solution, curr_lens);
+            logger.AddNewSolution("mdmtsp_step_" + std::to_string(i + 1), curr_max);
         }
         auto stop = std::chrono::high_resolution_clock::now();
         double real_time =
@@ -128,9 +149,12 @@ int main(int argc, char **argv) {
         j["time"] = real_time;
         j["max_len"] = max_len;
         j["lens"] = lens;
+        logger.AddInfo("Finish mdmtsp solve. final_max_len=" + std::to_string(max_len));
+        logger.Shutdown();
         std::cout << j.dump();
         return 0;
     }
 
+    logger.Shutdown();
     throw std::runtime_error("Unknown problem type. Supported: tsp, mdmtsp_minmax");
 }
