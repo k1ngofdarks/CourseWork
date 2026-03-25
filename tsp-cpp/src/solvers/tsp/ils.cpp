@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 #include <random>
 #include <chrono>
 #include <exception>
@@ -30,6 +31,7 @@ namespace tsp {
 
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
+            auto &logger = app::Logger::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
 
             auto nearest = tsp::SolverFactory::Create("nearest");
@@ -37,14 +39,25 @@ namespace tsp {
                                                               {std::make_pair("time", std::to_string(time_limit))});
             nearest->Solve(route);
             opt_2->Solve(route);
+            double best_len = inst.RouteLength(route);
+            logger.AddInfo("[ils] initial best=" + std::to_string(best_len));
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
                 std::vector<int> new_route = route;
                 KDoubleBridgeMove(new_route, cnt_pert);
 
                 opt_2->Solve(new_route);
-                if (inst.RouteLength(new_route) <= inst.RouteLength(route)) {
+                const double new_len = inst.RouteLength(new_route);
+                if (new_len < best_len) {
                     route = new_route;
+                    best_len = new_len;
+                    logger.AddInfo("[ils] improved at iter=" + std::to_string(iter_id) +
+                                   ", best=" + std::to_string(best_len));
+                }
+                if (iter_id % 50 == 0) {
+                    logger.AddDebug("[ils] iter=" + std::to_string(iter_id) +
+                                    ", candidate=" + std::to_string(new_len) +
+                                    ", best=" + std::to_string(best_len));
                 }
             }
         }

@@ -48,6 +48,8 @@ namespace app {
         void WorkerLoop();
         void FlushSnapshotLocked();
         static std::string NowString();
+        std::string MakeEventPrefixLocked(const std::string &level) const;
+        double ElapsedSecondsLocked() const;
 
         std::mutex mtx;
         std::ofstream file;
@@ -57,6 +59,7 @@ namespace app {
         Mode mode = Mode::Info;
         int flush_interval_sec = 5;
         std::thread worker;
+        std::chrono::steady_clock::time_point start_time;
 
         std::vector<std::string> info_events;
         std::vector<std::string> debug_events;

@@ -26,10 +26,11 @@ namespace app {
 
         mode = new_mode;
         flush_interval_sec = std::max(1, interval_sec);
+        start_time = std::chrono::steady_clock::now();
         configured = true;
         dirty = true;
 
-        info_events.push_back("[INFO] Logger started for " + task_type + "/" + task_name +
+        info_events.push_back(MakeEventPrefixLocked("INFO") + " Logger started for " + task_type + "/" + task_name +
                               " (interval=" + std::to_string(flush_interval_sec) + "s)");
 
         worker = std::thread([this]() { WorkerLoop(); });
@@ -38,14 +39,14 @@ namespace app {
     void Logger::AddInfo(const std::string &message) {
         std::lock_guard<std::mutex> lock(mtx);
         if (!configured) return;
-        info_events.push_back("[INFO] " + NowString() + " | " + message);
+        info_events.push_back(MakeEventPrefixLocked("INFO") + " " + message);
         dirty = true;
     }
 
     void Logger::AddDebug(const std::string &message) {
         std::lock_guard<std::mutex> lock(mtx);
         if (!configured || mode != Mode::Debug) return;
-        debug_events.push_back("[DEBUG] " + NowString() + " | " + message);
+        debug_events.push_back(MakeEventPrefixLocked("DEBUG") + " " + message);
         dirty = true;
     }
 
@@ -53,14 +54,14 @@ namespace app {
         std::lock_guard<std::mutex> lock(mtx);
         if (!configured) return;
 
-        info_events.push_back("[INFO] " + NowString() + " | New solution from " + source +
+        info_events.push_back(MakeEventPrefixLocked("INFO") + " New solution from " + source +
                               ", objective=" + std::to_string(objective_value));
 
         const bool improved = !best_objective.has_value() || objective_value < *best_objective;
         if (improved) {
             best_objective = objective_value;
             improvements.push_back({NowString(), source, objective_value});
-            info_events.push_back("[INFO] " + NowString() + " | Best improved to " +
+            info_events.push_back(MakeEventPrefixLocked("INFO") + " Best improved to " +
                                   std::to_string(objective_value));
         }
         dirty = true;
@@ -126,6 +127,18 @@ namespace app {
         std::tm tm = *std::localtime(&t);
         std::ostringstream out;
         out << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        return out.str();
+    }
+
+    double Logger::ElapsedSecondsLocked() const {
+        using namespace std::chrono;
+        return duration_cast<duration<double>>(steady_clock::now() - start_time).count();
+    }
+
+    std::string Logger::MakeEventPrefixLocked(const std::string &level) const {
+        std::ostringstream out;
+        out << "[" << level << "] " << NowString() << " (+"
+            << std::fixed << std::setprecision(3) << ElapsedSecondsLocked() << "s) |";
         return out.str();
     }
 
