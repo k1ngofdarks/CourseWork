@@ -1,0 +1,6 @@
+{
+  "problem": "mdmtsp_minmax",
+  "num_runs": 100,
+  "num_customers": 1000,
+  "num_depots": 5
+}

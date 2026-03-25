@@ -74,11 +74,17 @@ def _parse_json_npz_mode(task_json: Dict[str, Any], base_dir: Path, fallback_coo
     latlon = latlon_for_selected(ids, id_to_coord)
 
     problem = task_json.get("problem", "tsp")
-    depots = task_json.get("depots", [])
+    depots_idx: List[int] = []
 
     if problem == "mdmtsp_minmax":
-        id_to_pos = {v: i for i, v in enumerate(ids)}
-        depots_idx = [id_to_pos[d] for d in depots]
+        depots = task_json.get("depots", [])
+        if not depots and "num_depots" in task_json:
+            num_depots = task_json["num_depots"]
+            depots_idx = np.random.choice(n_nodes, num_depots, replace=False).tolist()
+        else:
+            id_to_pos = {v: i for i, v in enumerate(ids)}
+            depots_idx = [id_to_pos[d] for d in depots]
+
         payload_obj = {"n": n_nodes, "latlon": latlon.T.tolist(), "depots": depots_idx}
         return json.dumps(payload_obj), n_nodes, ids, problem, depots_idx
 
@@ -94,46 +100,62 @@ def build_payload_from_txt(task_path: Path, coords_path: Path) -> Tuple[str, int
     return json.dumps(payload_obj), n_nodes, ids, "tsp", []
 
 
-def build_payload_from_json(task_path: Path, fallback_coords: Path) -> Tuple[str, int, List[int], str, List[int]]:
-    task_json = json.loads(task_path.read_text(encoding="utf-8"))
+def build_payload_from_json(task_json: Dict[str, Any], task_path: Path, fallback_coords: Path) -> Tuple[str, int, List[int], str, List[int]]:
     problem = task_json.get("problem", "tsp")
 
-    if "matrix" in task_json:
-        n_nodes = len(task_json["matrix"])
+    # 1. Если задано количество случайных точек
+    if "num_customers" in task_json:
+        n_nodes = task_json["num_customers"]
         ids = task_json.get("ids", list(range(n_nodes)))
         if len(ids) != n_nodes:
             raise ValueError(f"ids length {len(ids)} does not match n_nodes {n_nodes}")
 
-        depots = task_json.get("depots", [])
-        payload_obj = {"matrix": task_json["matrix"]}
-        depots_idx: List[int] = []
-        if problem == "mdmtsp_minmax":
-            payload_obj["depots"] = depots
-            depots_idx = depots
-        return json.dumps(payload_obj), n_nodes, ids, problem, depots_idx
+        # Генерируем случайные координаты [0, 1]^2
+        coords = np.random.rand(n_nodes, 2).tolist()
+        payload_obj = {
+            "coordinates": coords,
+            "metric": task_json.get("metric", "euclidean"),
+        }
 
-    if "coordinates" in task_json:
+    # 2. Если задана матрица расстояний
+    elif "matrix" in task_json:
+        n_nodes = len(task_json["matrix"])
+        ids = task_json.get("ids", list(range(n_nodes)))
+        if len(ids) != n_nodes:
+            raise ValueError(f"ids length {len(ids)} does not match n_nodes {n_nodes}")
+        payload_obj = {"matrix": task_json["matrix"]}
+
+    # 3. Если жестко заданы координаты
+    elif "coordinates" in task_json:
         coordinates = task_json["coordinates"]
         n_nodes = len(coordinates)
         ids = task_json.get("ids", list(range(n_nodes)))
         if len(ids) != n_nodes:
             raise ValueError(f"ids length {len(ids)} does not match n_nodes {n_nodes}")
-
         payload_obj = {
             "coordinates": coordinates,
             "metric": task_json.get("metric", "euclidean"),
         }
-        depots = task_json.get("depots", [])
-        depots_idx: List[int] = []
-        if problem == "mdmtsp_minmax":
-            payload_obj["depots"] = depots
-            depots_idx = depots
-        return json.dumps(payload_obj), n_nodes, ids, problem, depots_idx
 
-    if "ids" in task_json:
+    # 4. Режим NPZ (через IDs)
+    elif "ids" in task_json:
         return _parse_json_npz_mode(task_json, task_path.parent, fallback_coords)
+    else:
+        raise ValueError("JSON task must contain one of: num_customers, matrix, coordinates, or ids.")
 
-    raise ValueError("JSON task must contain one of: matrix, coordinates, or ids (for NPZ mode).")
+    # Обработка депо для MDMTSP
+    depots_idx: List[int] = []
+    if problem == "mdmtsp_minmax":
+        depots = task_json.get("depots", [])
+        # Если депо не заданы жестко, но задано их количество - генерим случайные индексы
+        if not depots and "num_depots" in task_json:
+            num_depots = task_json["num_depots"]
+            depots_idx = np.random.choice(n_nodes, num_depots, replace=False).tolist()
+        else:
+            depots_idx = depots
+        payload_obj["depots"] = depots_idx
+
+    return json.dumps(payload_obj), n_nodes, ids, problem, depots_idx
 
 
 def ensure_problem_arg(cpp_args: List[str], problem: str) -> List[str]:
@@ -151,70 +173,112 @@ def main() -> None:
     task_path = Path(args.task)
     coords_npz = Path(args.coords)
 
+    num_runs = 1
+    task_json = None
+
     if task_path.suffix.lower() == ".json":
-        payload, n_nodes, ids, problem, depots = build_payload_from_json(task_path, coords_npz)
-    else:
-        payload, n_nodes, ids, problem, depots = build_payload_from_txt(task_path, coords_npz)
+        task_json = json.loads(task_path.read_text(encoding="utf-8"))
+        num_runs = task_json.get("num_runs", 1)
 
-    cpp_args = ensure_problem_arg(cpp_args, problem)
+    cpp_args_prepared = False
+    algorithm = "unknown"
 
-    recompiles_if_necessary()
+    total_cost = 0.0
+    total_time = 0.0
+    best_cost = float('inf')
+    best_solution_payload = {}
+    best_route_ids = []
 
-    p = subprocess.run(["build/src/tsp"] + cpp_args, input=payload, text=True, capture_output=True)
-    if p.returncode != 0:
-        raise RuntimeError(p.stderr)
+    for run_idx in range(num_runs):
+        if task_json is not None:
+            # Парсинг/Генерация вызывается каждую итерацию для обеспечения уникальных данных (координаты/депо)
+            payload, n_nodes, ids, problem, depots = build_payload_from_json(task_json, task_path, coords_npz)
+        else:
+            payload, n_nodes, ids, problem, depots = build_payload_from_txt(task_path, coords_npz)
 
-    output = json.loads(p.stdout)
-    algorithm = detect_algorithm_name(cpp_args)
+        if not cpp_args_prepared:
+            cpp_args = ensure_problem_arg(cpp_args, problem)
+            recompiles_if_necessary()
+            algorithm = detect_algorithm_name(cpp_args)
+            cpp_args_prepared = True
 
-    if problem == "mdmtsp_minmax":
-        routes_pos = output["routes"]
-        real_time = output["time"]
-        max_len = output["max_len"]
-        lens = output.get("lens", [])
+        p = subprocess.run(["build/src/tsp"] + cpp_args, input=payload, text=True, capture_output=True)
+        if p.returncode != 0:
+            raise RuntimeError(p.stderr)
 
-        ok, msg = validate_mdmtsp_routes(routes_pos, n_nodes, depots)
-        routes_ids = [[ids[v] for v in route] for route in routes_pos]
+        output = json.loads(p.stdout)
 
-        out_json_path = save_solution_json(
-            task_path=task_path,
-            payload={
-                "problem": "mdmtsp_minmax",
-                "algorithm": algorithm,
-                "max_cost": max_len,
-                "route_costs": lens,
-                "routes": routes_ids,
-                "time": real_time,
-            },
-        )
+        if problem == "mdmtsp_minmax":
+            routes_pos = output["routes"]
+            real_time = output["time"]
+            max_len = output["max_len"]
+            lens = output.get("lens", [])
 
-        logging.info(f"Valid: {ok} ({msg}) | Max route length: {max_len:.6f} km | Time: {real_time:.4f} s")
-        logging.info(f"Solution JSON saved: {out_json_path}")
-        return
+            ok, msg = validate_mdmtsp_routes(routes_pos, n_nodes, depots)
+            routes_ids = [[ids[v] for v in route] for route in routes_pos]
 
-    route_pos = output["route"]
-    real_time = output["time"]
-    length_km = output["len"]
+            cost = max_len
+            total_cost += cost
+            total_time += real_time
 
-    ok, msg = validate_tour(route_pos, n_nodes)
-    route_ids = [ids[i] for i in route_pos]
+            logging.info(f"Run {run_idx+1}/{num_runs} | Valid: {ok} | Cost (Max len): {cost:.6f} | Time: {real_time:.4f} s")
 
-    out_path = save_solution(task_path, route_ids)
-    out_json_path = save_solution_json(
-        task_path=task_path,
-        payload={
-            "problem": "tsp",
-            "algorithm": algorithm,
-            "cost": length_km,
-            "optimal_route": route_ids,
-            "time": real_time,
-        },
-    )
+            if cost < best_cost:
+                best_cost = cost
+                best_solution_payload = {
+                    "problem": "mdmtsp_minmax",
+                    "algorithm": algorithm,
+                    "best_max_cost": max_len,
+                    "route_costs": lens,
+                    "routes": routes_ids,
+                    "depots": depots,
+                    "best_run_idx": run_idx + 1
+                }
+        else:
+            route_pos = output["route"]
+            real_time = output["time"]
+            length_km = output["len"]
 
-    logging.info(f"Valid: {ok} ({msg}) | Length: {length_km:.6f} km | Time: {real_time:.4f} s")
-    logging.info(f"Solution saved: {out_path}")
+            ok, msg = validate_tour(route_pos, n_nodes)
+            route_ids = [ids[i] for i in route_pos]
+
+            cost = length_km
+            total_cost += cost
+            total_time += real_time
+
+            logging.info(f"Run {run_idx+1}/{num_runs} | Valid: {ok} | Cost: {cost:.6f} | Time: {real_time:.4f} s")
+
+            if cost < best_cost:
+                best_cost = cost
+                best_route_ids = route_ids
+                best_solution_payload = {
+                    "problem": "tsp",
+                    "algorithm": algorithm,
+                    "best_cost": length_km,
+                    "optimal_route": route_ids,
+                    "best_run_idx": run_idx + 1
+                }
+
+    # Вычисляем среднее и сохраняем результаты по завершении всех запусков
+    avg_cost = total_cost / num_runs
+    avg_time = total_time / num_runs
+
+    best_solution_payload["avg_cost"] = avg_cost
+    best_solution_payload["avg_time"] = avg_time
+    best_solution_payload["num_runs"] = num_runs
+
+    out_json_path = save_solution_json(task_path, best_solution_payload)
+
+    logging.info("-" * 40)
+    logging.info(f"Total Runs: {num_runs}")
+    logging.info(f"Average Cost: {avg_cost:.6f} | Average Time: {avg_time:.4f} s")
+    logging.info(f"Best Cost: {best_cost:.6f} (found at run {best_solution_payload.get('best_run_idx')})")
     logging.info(f"Solution JSON saved: {out_json_path}")
-    logging.info(f"Route (first 25 ids): {route_ids[:25]} ...")
+
+    if best_solution_payload.get("problem") != "mdmtsp_minmax":
+        out_path = save_solution(task_path, best_route_ids)
+        logging.info(f"Solution TXT saved: {out_path}")
+        logging.info(f"Best Route (first 25 ids): {best_route_ids[:25]} ...")
 
 
 if __name__ == "__main__":
