@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <random>
 #include <algorithm>
@@ -20,8 +21,14 @@ namespace tsp {
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
             auto start = std::chrono::high_resolution_clock::now();
+            SolverLogScope log_scope(logger_, stop_token_, "2-opt", -1.0, true, debug_logging_enabled_);
+            log_scope.ReportCandidate(route, CalculateRouteLength(route));
             bool found_improvement = true;
             while (found_improvement) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    return;
+                }
                 found_improvement = false;
                 for (int i = 0; i < n - 1; ++i) {
                     if (time_limit > 0 && static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(
@@ -33,9 +40,11 @@ namespace tsp {
                             inst.Distance(route[i], route[j]) + inst.Distance(route[i + 1], route[j + 1])) {
                             SwapPath(route, i + 1, j);
                             found_improvement = true;
+                            log_scope.ReportCandidate(route, CalculateRouteLength(route));
                         }
                     }
                 }
+                log_scope.TickPeriodic(route);
             }
         }
 

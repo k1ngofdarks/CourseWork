@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <random>
 #include <algorithm>
@@ -16,6 +17,8 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
+            SolverLogScope log_scope(logger_, stop_token_, "nearest", -1.0, true, debug_logging_enabled_);
+            std::vector<int> old_route = route;
             route.clear();
             route.reserve(n + 1);
             std::vector<char> used(n, 0);
@@ -23,6 +26,11 @@ namespace tsp {
             route.push_back(cur);
             used[cur] = 1;
             for (int step = 1; step < n; ++step) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    route = old_route;
+                    return;
+                }
                 int best = -1;
                 double bestd = 1e300;
                 for (int j = 0; j < n; ++j)
@@ -36,8 +44,10 @@ namespace tsp {
                 route.push_back(best);
                 used[best] = 1;
                 cur = best;
+                log_scope.TickPeriodic(route);
             }
             route.push_back(route[0]);
+            log_scope.ReportCandidate(route, CalculateRouteLength(route));
         }
     };
 

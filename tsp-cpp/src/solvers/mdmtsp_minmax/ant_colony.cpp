@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 
 #include <algorithm>
@@ -34,6 +35,13 @@ namespace mdmtsp_minmax {
         void Solve(std::vector<std::vector<int>> &routes) override {
 //            FILE *fp = freopen("/home/nikita/CLionProjects/CourseWork/tsp-cpp/my_logs.txt", "w", stdout);
             const auto &inst = Instance::GetInstance();
+            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.ant", -1.0, true, debug_logging_enabled_);
+            two_opt_solver->SetLogger(logger_);
+            two_opt_solver->SetStopToken(stop_token_);
+            two_opt_solver->SetDebugLoggingEnabled(false);
+            nn_solver->SetLogger(logger_);
+            nn_solver->SetStopToken(stop_token_);
+            nn_solver->SetDebugLoggingEnabled(false);
             int n = inst.GetN();
             std::vector<int> customers = inst.GetCustomers();
             std::vector<std::vector<int>> result_routes;
@@ -73,6 +81,10 @@ namespace mdmtsp_minmax {
             }
 
             for (int epoch_id = 0; epoch_id < n_iter; ++epoch_id) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    break;
+                }
                 std::vector<std::vector<int>> epoch_best_routes;
                 long double epoch_best_length = 1e18;
 
@@ -106,6 +118,18 @@ namespace mdmtsp_minmax {
                     if (curr_length < result_length) {
                         result_length = curr_length;
                         result_routes = curr_routes;
+                        size_t max_id = 0;
+                        long double max_len = 0;
+                        for (size_t rid = 0; rid < curr_routes.size(); ++rid) {
+                            long double len = inst.RouteLength(curr_routes[rid]);
+                            if (len > max_len) {
+                                max_len = len;
+                                max_id = rid;
+                            }
+                        }
+                        if (!curr_routes.empty()) {
+                            log_scope.ReportCandidate(curr_routes[max_id], static_cast<double>(max_len));
+                        }
                     }
                 }
 
@@ -120,6 +144,9 @@ namespace mdmtsp_minmax {
                         pheromone_level[route[i]][route[i + 1]] += delta;
                         pheromone_level[route[i + 1]][route[i]] += delta;
                     }
+                }
+                if (!epoch_best_routes.empty()) {
+                    log_scope.TickPeriodic(epoch_best_routes.front());
                 }
             }
             std::swap(routes, result_routes);

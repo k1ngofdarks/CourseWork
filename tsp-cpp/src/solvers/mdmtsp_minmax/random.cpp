@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <instance.h>
 
@@ -20,6 +21,7 @@ namespace mdmtsp_minmax {
 
         void Solve(std::vector<std::vector<int>> &routes) override {
             const auto &inst = Instance::GetInstance();
+            tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.random", -1.0, true, debug_logging_enabled_);
             const auto &depots = inst.GetDepots();
             auto customers = inst.GetCustomers();
 
@@ -29,6 +31,10 @@ namespace mdmtsp_minmax {
             std::vector<std::vector<int>> best_routes;
 
             for (int it = 0; it < iter; ++it) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    break;
+                }
                 std::shuffle(customers.begin(), customers.end(), rng);
 
                 std::vector<std::vector<int>> cur(depots.size());
@@ -47,6 +53,21 @@ namespace mdmtsp_minmax {
                 if (cur_max < best_max) {
                     best_max = cur_max;
                     best_routes = cur;
+                    if (!best_routes.empty()) {
+                        size_t idx = 0;
+                        double max_len = 0;
+                        for (size_t rid = 0; rid < best_routes.size(); ++rid) {
+                            double len = inst.RouteLength(best_routes[rid]);
+                            if (len > max_len) {
+                                max_len = len;
+                                idx = rid;
+                            }
+                        }
+                        log_scope.ReportCandidate(best_routes[idx], max_len);
+                    }
+                }
+                if (!cur.empty()) {
+                    log_scope.TickPeriodic(cur.front());
                 }
             }
 

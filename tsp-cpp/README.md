@@ -118,3 +118,86 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 - `route_costs` — длина каждого маршрута
 - `routes` — список маршрутов (в id исходных данных)
 - `time`
+
+### Логирование и graceful stop (TSP + MDMTSP)
+
+Поддерживаются глобальные опции логирования (применяются ко всем `--step`):
+
+- `--log_file <path>` — текстовый лог (`INFO`/`DEBUG`)
+- `--csv_file <path>` — CSV лог событий (`solver,event,elapsed_seconds,best_length,best_found_at_seconds`)
+- `--log_interval <seconds>` — запись текущего лучшего решения каждые N секунд
+- `--debug <true|false|1|0>` — включить debug-логи (по умолчанию `false`)
+- `--console_log <true|false|1|0>` — вывод логов в консоль (`stderr`), по умолчанию `false`
+- `--stop_file <path>` — graceful stop: при появлении файла алгоритмы завершают текущую итерацию и выходят
+
+Поведение логера:
+- В файл пишутся периодические срезы (`periodic_best`), а старт солвера (`event=start`) относится к `DEBUG`.
+- Улучшения между срезами используются для обновления внутреннего состояния best, но не спамят `INFO` в файл.
+- Маршрут не пишется в текстовый/CSV лог (хранится только в памяти логера как текущий best-route).
+- `DEBUG` сообщения (включая `event=start`) пишутся только при `--debug true`.
+- Вложенные солверы тоже логируют, но временная шкала единая (от старта logger-сессии), поэтому время в CSV согласовано.
+
+Мини-дока по функциям логера (`SolverLogScope`):
+- `ReportCandidate(route, length)` — сообщить кандидата; если лучше предыдущего, обновится best в памяти логера.
+- `TickPeriodic(route)` — при достижении `log_interval` пишет `periodic_best` в log/csv.
+- `StopRequested()` — проверка graceful stop через `IStopToken`.
+- `Debug(message)` — строковый debug лог.
+- `DebugValues(a, b, c, ...)` — debug как `printf`-стиль (конкатенация любых значений через stream).
+
+Отдельное управление DEBUG для внутренних алгоритмов:
+- У любого солвера есть `SetDebugLoggingEnabled(bool)` (см. `solver.h`).
+- Это позволяет прокинуть один и тот же logger во внутренние солверы, но отключить именно `DEBUG`-сообщения у них.
+- Пример: в `ils` внутренним `nearest` и `2-opt` выставляется `SetDebugLoggingEnabled(false)`, поэтому они участвуют в общей истории best/periodic, но не шумят debug-логами.
+
+Пример:
+
+```bash
+python3 run.py \
+  --task tasks/tsp/example1.json \
+  --step nearest \
+  --step 2-opt --time 30 \
+  --log_file logs/tsp.log \
+  --csv_file logs/tsp.csv \
+  --log_interval 5 \
+  --debug true \
+  --console_log false \
+  --stop_file /tmp/tsp.stop
+```
+
+Для MDMTSP Min-Max используются те же параметры:
+
+```bash
+python3 run.py \
+  --task tasks/mdmtsp_minmax/example1.json \
+  --step ant --n_iter 50 \
+  --log_file logs/md.log \
+  --csv_file logs/md.csv \
+  --log_interval 3
+```
+
+### Если падает сборка LKH (`OBJ/*.o: No such file or directory`)
+
+Перед сборкой можно подготовить папку объектных файлов и собрать LKH вручную:
+
+```bash
+cd LKH-2.0.11
+mkdir -p SRC/OBJ
+make all
+```
+
+Также CMake-таргет `extern_lib` теперь автоматически создает `LKH-2.0.11/SRC/OBJ` перед `make`.
+
+### Smoke-тест логера
+
+Для проверки режимов логгера без запуска полного TSP можно использовать отдельный бинарник:
+
+```bash
+cmake -S . -B build
+cmake --build build -j4 --target logger_smoke
+./build/src/logger_smoke \
+  --log_file logs/smoke.log \
+  --csv_file logs/smoke.csv \
+  --log_interval 2 \
+  --debug true \
+  --console_log true
+```

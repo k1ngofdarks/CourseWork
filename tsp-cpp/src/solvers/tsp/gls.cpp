@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <random>
 #include <chrono>
@@ -29,17 +30,27 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
+            SolverLogScope log_scope(logger_, stop_token_, "gls", -1.0, true, debug_logging_enabled_);
 
             auto nearest = tsp::SolverFactory::Create("nearest");
+            nearest->SetLogger(logger_);
+            nearest->SetStopToken(stop_token_);
+            nearest->SetDebugLoggingEnabled(false);
             nearest->Solve(route);
             int n = static_cast<int>(route.size()) - 1;
             std::vector<std::vector<int>> penalties(n, std::vector<int>(n, 0));
             std::vector<int> best_route = route;
+            log_scope.ReportCandidate(best_route, inst.RouteLength(best_route));
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    break;
+                }
                 ImprovedTwoOpt(route, penalties);
                 if (inst.RouteLength(route) <= inst.RouteLength(best_route)) {
                     best_route = route;
+                    log_scope.ReportCandidate(best_route, inst.RouteLength(best_route));
                 }
                 double max_utility = 0;
                 for (size_t i = 0; i < n; i++) {
@@ -54,6 +65,7 @@ namespace tsp {
                         ++penalties[route[i]][route[i + 1]];
                     }
                 }
+                log_scope.TickPeriodic(best_route);
             }
             route = best_route;
         }

@@ -1,6 +1,7 @@
 #include <factory.h>
 #include <solver.h>
 #include <instance.h>
+#include <logger.h>
 
 #include <chrono>
 #include <iostream>
@@ -10,6 +11,7 @@
 
 struct ParsedArgs {
     std::string problem = "tsp";
+    std::unordered_map<std::string, std::string> global_opts;
     std::vector<std::pair<std::string, std::unordered_map<std::string, std::string>>> steps;
 };
 
@@ -33,6 +35,10 @@ inline ParsedArgs ParseArguments(int argc, char **argv) {
             solver_name = val;
         } else if (name == "problem") {
             parsed.problem = val;
+        } else if (name == "log_file" || name == "csv_file" || name == "log_interval" || name == "debug" ||
+                   name == "console_log" ||
+                   name == "stop_file") {
+            parsed.global_opts[name] = val;
         } else {
             args[name] = val;
         }
@@ -41,15 +47,6 @@ inline ParsedArgs ParseArguments(int argc, char **argv) {
         parsed.steps.emplace_back(solver_name, args);
     }
     return parsed;
-}
-
-inline double CalculateRouteLength(const std::vector<int> &route) {
-    const tsp::Instance &inst = tsp::Instance::GetInstance();
-    double len = 0;
-    for (size_t i = 0; i + 1 < route.size(); ++i) {
-        len += inst.Distance(route[i], route[i + 1]);
-    }
-    return len;
 }
 
 inline double CalculateMaxRouteLength(const std::vector<std::vector<int>> &routes, std::vector<double> &lens) {
@@ -69,10 +66,14 @@ int main(int argc, char **argv) {
     auto parsed = ParseArguments(argc, argv);
 
     if (parsed.problem == "tsp") {
+        auto logger = tsp::CreateLoggerFromOptions(parsed.global_opts);
+        auto stop_token = tsp::CreateStopTokenFromOptions(parsed.global_opts);
         std::vector<std::unique_ptr<tsp::Solver>> solvers;
         for (const auto &[name, args]: parsed.steps) {
             solvers.push_back(std::move(tsp::SolverFactory::Create(name)));
             solvers.back()->Configure(args);
+            solvers.back()->SetLogger(logger);
+            solvers.back()->SetStopToken(stop_token);
         }
         const tsp::Instance &inst = tsp::Instance::GetInstance();
 
@@ -92,16 +93,20 @@ int main(int argc, char **argv) {
         nlohmann::json j;
         j["route"] = solution;
         j["time"] = real_time;
-        j["len"] = CalculateRouteLength(solution);
+        j["len"] = tsp::CalculateRouteLength(solution);
         std::cout << j.dump();
         return 0;
     }
 
     if (parsed.problem == "mdmtsp_minmax") {
+        auto logger = tsp::CreateLoggerFromOptions(parsed.global_opts);
+        auto stop_token = tsp::CreateStopTokenFromOptions(parsed.global_opts);
         std::vector<std::unique_ptr<mdmtsp_minmax::Solver>> solvers;
         for (const auto &[name, args]: parsed.steps) {
             solvers.push_back(std::move(mdmtsp_minmax::SolverFactory::Create(name)));
             solvers.back()->Configure(args);
+            solvers.back()->SetLogger(logger);
+            solvers.back()->SetStopToken(stop_token);
         }
 
         const auto &inst = mdmtsp_minmax::Instance::GetInstance();
