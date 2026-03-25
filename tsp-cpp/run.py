@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 import subprocess
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -200,14 +199,32 @@ def summarize_routes(routes_ids: List[List[int]], limit_routes: int = 3, limit_n
     return " | ".join(chunks)
 
 
+def save_log_payloads(task_path: Path, problem: str, payload: Dict[str, Any]) -> None:
+    logs_dir = Path(__file__).resolve().parent / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    prefix = f"{problem}_{task_path.stem}"
+    (logs_dir / f"{prefix}_best_solution_payload.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    if problem == "mdmtsp_minmax" and "routes" in payload:
+        (logs_dir / f"{prefix}_best_routes.json").write_text(
+            json.dumps(payload["routes"], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    if problem == "tsp" and "optimal_route" in payload:
+        (logs_dir / f"{prefix}_best_route.json").write_text(
+            json.dumps(payload["optimal_route"], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+
 def main() -> None:
     args, cpp_args = parse_args()
     configure_python_logger(args.log_mode)
 
     task_path = Path(args.task)
     coords_npz = Path(args.coords)
-    started_at = datetime.now().astimezone()
-
     num_runs = 1
     task_json = None
 
@@ -225,9 +242,8 @@ def main() -> None:
     best_route_ids = []
 
     logging.info(
-        "Start run | task=%s | started_at=%s | log_mode=%s",
+        "Start run | task=%s | log_mode=%s",
         task_path,
-        started_at.strftime("%Y-%m-%d %H:%M:%S %z"),
         args.log_mode,
     )
     logging.debug("Initial CLI args for solver: %s", cpp_args)
@@ -346,13 +362,14 @@ def main() -> None:
     best_solution_payload["num_runs"] = num_runs
 
     out_json_path = save_solution_json(task_path, best_solution_payload)
+    save_log_payloads(task_path, best_solution_payload["problem"], best_solution_payload)
 
     logging.info("-" * 40)
     logging.info(f"Total Runs: {num_runs}")
     logging.info(f"Average Cost: {avg_cost:.6f} | Average Time: {avg_time:.4f} s")
     logging.info(f"Best Cost: {best_cost:.6f} (found at run {best_solution_payload.get('best_run_idx')})")
     logging.info(f"Solution JSON saved: {out_json_path}")
-    logging.debug("Best solution payload: %s", json.dumps(best_solution_payload, ensure_ascii=False))
+    logging.debug("Best solution payload saved to logs directory")
 
     if best_solution_payload.get("problem") != "mdmtsp_minmax":
         out_path = save_solution(task_path, best_route_ids)

@@ -108,6 +108,9 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --log_mode debug --step 
 - Python-обвязка (`run.py`) пишет консольный лог запуска.
 - C++ логгер пишет файл в `logs/{task_type}_{task_name}.log`.
 - Каждое новое найденное решение передаётся в логгер через `AddNewSolution(...)`.
+- Для лучшего решения дополнительно сохраняются артефакты в `logs/`:
+  - `{task_type}_{task_name}_best_solution_payload.json`
+  - `{task_type}_{task_name}_best_route.json` или `{task_type}_{task_name}_best_routes.json`
 - Логгер хранит:
   - текущее лучшее значение целевой функции,
   - историю улучшений,
@@ -121,9 +124,9 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --log_mode debug --step 
 - сами алгоритмы при этом не меняются, логгер только наблюдает за решениями.
 
 Что есть в snapshot-файле:
-- время создания snapshot;
+- номер snapshot;
 - имя задачи и тип задачи;
-- время старта и elapsed time;
+- elapsed time;
 - текущее лучшее значение метрики;
 - история улучшений best solution;
 - список `INFO` событий;

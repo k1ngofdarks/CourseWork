@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 #include <random>
 #include <algorithm>
 
@@ -11,11 +12,14 @@ namespace tsp {
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.count("start")) start = std::stoi(opts.at("start"));
+            app::Logger::GetInstance().AddDebug("nearest configured: start=" + std::to_string(start));
         }
 
         void Solve(std::vector<int> &route) override {
+            auto &logger = app::Logger::GetInstance();
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
+            logger.AddInfo("nearest: start solve, n=" + std::to_string(n));
             route.clear();
             route.reserve(n + 1);
             std::vector<char> used(n, 0);
@@ -38,6 +42,7 @@ namespace tsp {
                 cur = best;
             }
             route.push_back(route[0]);
+            logger.AddInfo("nearest: finish solve, route_len=" + std::to_string(inst.RouteLength(route)));
         }
     };
 

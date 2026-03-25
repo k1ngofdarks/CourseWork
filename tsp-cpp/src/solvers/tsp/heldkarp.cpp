@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 #include <algorithm>
 #include <limits>
 #include <vector>
@@ -17,13 +18,21 @@ public:
     void Configure(const std::unordered_map<std::string, std::string> &opts) override {
         if (opts.count("start")) start = std::stoi(opts.at("start"));
         if (opts.count("max_n")) max_n = std::stoi(opts.at("max_n"));
+        app::Logger::GetInstance().AddDebug(
+                "heldkarp configured: start=" + std::to_string(start) +
+                ", max_n=" + std::to_string(max_n));
     }
 
     void Solve(std::vector<int> &route) override {
+        auto &logger = app::Logger::GetInstance();
         const Instance &inst = Instance::GetInstance();
         const int n = inst.GetN();
+        logger.AddInfo("heldkarp: start solve, n=" + std::to_string(n));
 
-        if (n <= 0 || n > max_n) return;
+        if (n <= 0 || n > max_n) {
+            logger.AddInfo("heldkarp: skipped, n=" + std::to_string(n) + ", max_n=" + std::to_string(max_n));
+            return;
+        }
 
         const int s = std::clamp(start, 0, n - 1);
         const uint32_t FULL = (1u << n);
@@ -96,6 +105,7 @@ public:
         new_route.push_back(s);
 
         route.swap(new_route);
+        logger.AddInfo("heldkarp: finish solve, route_len=" + std::to_string(inst.RouteLength(route)));
     }
 };
 

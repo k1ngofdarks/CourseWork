@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 
 #include <algorithm>
 #include <vector>
@@ -10,9 +11,11 @@ namespace mdmtsp_minmax {
     class NearestNeighborSolver : public Solver {
     public:
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
+            app::Logger::GetInstance().AddDebug("mdmtsp nn configured");
         }
 
         void Solve(std::vector<std::vector<int>> &routes) override {
+            auto &logger = app::Logger::GetInstance();
             const auto &inst = Instance::GetInstance();
             const auto &depots = inst.GetDepots();
             auto customers = inst.GetCustomers();
@@ -27,6 +30,7 @@ namespace mdmtsp_minmax {
             }
 
             std::vector<int> not_visited(customers.begin(), customers.end());
+            logger.AddInfo("mdmtsp nn: start solve, customers=" + std::to_string(not_visited.size()));
 
             while (!not_visited.empty()) {
                 int best_route_id =
@@ -58,6 +62,14 @@ namespace mdmtsp_minmax {
             }
 
             std::swap(routes, best_routes);
+            std::vector<double> route_lens;
+            double max_len = 0.0;
+            for (const auto &route: routes) {
+                double len = inst.RouteLength(route);
+                route_lens.push_back(len);
+                max_len = std::max(max_len, len);
+            }
+            logger.AddInfo("mdmtsp nn: finish solve, max_len=" + std::to_string(max_len));
         }
     };
 

@@ -1,6 +1,7 @@
 #include <solver.h>
 #include <factory.h>
 #include <instance.h>
+#include <logger.h>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
@@ -156,9 +157,15 @@ namespace tsp {
             if (opts.count("lkh_path")) {
                 lkh_path = opts.at("lkh_path");
             }
+            app::Logger::GetInstance().AddDebug(
+                    "lkh configured: time_limit=" + std::to_string(time_limit) +
+                    ", max_trials=" + std::to_string(max_trials) +
+                    ", lkh_path=" + lkh_path);
         }
-        
+
         void Solve(std::vector<int>& route) override {
+            auto &logger = app::Logger::GetInstance();
+            logger.AddInfo("lkh: start solve, n=" + std::to_string(Instance::GetInstance().GetN()));
             std::string tsp_file = GetTempFileName(".tsp");
             std::string par_file = GetTempFileName(".par");
             std::string initial_tour_file = GetTempFileName(".tour");
@@ -184,17 +191,21 @@ namespace tsp {
                 
                 if (result == 0) {
                     if (!ReadOptimizedTour(output_file, route)) {
+                        logger.AddInfo("lkh: output read failed, keeping original route");
                         std::cerr << "Warning: Could not read LKH output, keeping original tour\n";
                     }
                 } else {
+                    logger.AddInfo("lkh: external process failed, keeping original route");
                     std::cerr << "Warning: LKH execution failed, keeping original tour\n";
                 }
                 
             } catch (const std::exception& e) {
+                logger.AddInfo("lkh: exception, keeping original route");
                 std::cerr << "LKH Solver error: " << e.what() << ", keeping original tour\n";
             }
             
             CleanupFiles(temp_files);
+            logger.AddInfo("lkh: finish solve, route_len=" + std::to_string(Instance::GetInstance().RouteLength(route)));
         }
     };
 

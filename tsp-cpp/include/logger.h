@@ -33,6 +33,7 @@ namespace app {
         void AddDebug(const std::string &message);
         void AddNewSolution(const std::string &source, double objective_value);
         void AddNewSolution(const std::string &source, double objective_value, const std::string &route_snapshot);
+        void SaveNamedArtifact(const std::string &suffix, const std::string &content);
 
         void Shutdown();
 
@@ -49,7 +50,7 @@ namespace app {
 
         void WorkerLoop();
         void FlushSnapshotLocked();
-        static std::string NowString();
+        void SaveArtifactsLocked() const;
         double ElapsedSecondsLocked() const;
 
         std::mutex mtx;
@@ -69,7 +70,6 @@ namespace app {
         std::string best_route_snapshot;
         std::string task_type;
         std::string task_name;
-        std::string started_at;
         std::chrono::steady_clock::time_point started_monotonic;
         size_t snapshot_index = 0;
     };

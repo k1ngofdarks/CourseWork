@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 #include <random>
 #include <chrono>
 #include <exception>
@@ -24,22 +25,35 @@ namespace tsp {
             if (max_iter <= 0 && time_limit <= 0) {
                 throw std::invalid_argument("At least one of the parameters time or cnt_iter must be present");
             }
+            app::Logger::GetInstance().AddDebug(
+                    "gls configured: time_limit=" + std::to_string(time_limit) +
+                    ", max_iter=" + std::to_string(max_iter) +
+                    ", lambda=" + std::to_string(lambda));
         }
 
         void Solve(std::vector<int> &route) override {
+            auto &logger = app::Logger::GetInstance();
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
+            logger.AddInfo("gls: start solve, n=" + std::to_string(inst.GetN()));
 
             auto nearest = tsp::SolverFactory::Create("nearest");
             nearest->Solve(route);
             int n = static_cast<int>(route.size()) - 1;
             std::vector<std::vector<int>> penalties(n, std::vector<int>(n, 0));
             std::vector<int> best_route = route;
+            double best_len = inst.RouteLength(best_route);
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
                 ImprovedTwoOpt(route, penalties);
-                if (inst.RouteLength(route) <= inst.RouteLength(best_route)) {
+                const double cur_len = inst.RouteLength(route);
+                if (cur_len <= inst.RouteLength(best_route)) {
                     best_route = route;
+                    if (cur_len < best_len) {
+                        best_len = cur_len;
+                        logger.AddDebug("gls: improved route_len=" + std::to_string(best_len) +
+                                        ", iter=" + std::to_string(iter_id + 1));
+                    }
                 }
                 double max_utility = 0;
                 for (size_t i = 0; i < n; i++) {
@@ -56,6 +70,7 @@ namespace tsp {
                 }
             }
             route = best_route;
+            logger.AddInfo("gls: finish solve, route_len=" + std::to_string(inst.RouteLength(route)));
         }
 
     private:
