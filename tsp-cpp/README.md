@@ -126,15 +126,15 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 - `--log_file <path>` — текстовый лог (`INFO`/`DEBUG`)
 - `--csv_file <path>` — CSV лог событий (`solver,event,elapsed_seconds,best_length,best_found_at_seconds`)
 - `--log_interval <seconds>` — запись текущего лучшего решения каждые N секунд
-- `--debug <true|false|1|0>` — включить debug-логи
+- `--debug <true|false|1|0>` — включить debug-логи (по умолчанию `false`)
 - `--console_log <true|false|1|0>` — вывод логов в консоль (`stderr`), по умолчанию `false`
 - `--stop_file <path>` — graceful stop: при появлении файла алгоритмы завершают текущую итерацию и выходят
 
 Поведение логера:
-- В файл пишутся только периодические срезы (`periodic_best`) и служебные сообщения старта.
+- В файл пишутся периодические срезы (`periodic_best`), а старт солвера (`event=start`) относится к `DEBUG`.
 - Улучшения между срезами используются для обновления внутреннего состояния best, но не спамят `INFO` в файл.
 - Маршрут не пишется в текстовый/CSV лог (хранится только в памяти логера как текущий best-route).
-- `DEBUG` сообщения пишутся только при `--debug true`.
+- `DEBUG` сообщения (включая `event=start`) пишутся только при `--debug true`.
 - Вложенные солверы тоже логируют, но временная шкала единая (от старта logger-сессии), поэтому время в CSV согласовано.
 
 Мини-дока по функциям логера (`SolverLogScope`):

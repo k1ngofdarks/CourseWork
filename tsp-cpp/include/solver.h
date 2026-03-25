@@ -23,7 +23,7 @@ namespace tsp {
     protected:
         std::shared_ptr<ILogger> logger_;
         std::shared_ptr<IStopToken> stop_token_;
-        bool debug_logging_enabled_ = true;
+        bool debug_logging_enabled_ = false;
     };
 
     using SolverCreator = std::function<std::unique_ptr<Solver>()>;
@@ -44,7 +44,7 @@ namespace mdmtsp_minmax {
     protected:
         std::shared_ptr<tsp::ILogger> logger_;
         std::shared_ptr<tsp::IStopToken> stop_token_;
-        bool debug_logging_enabled_ = true;
+        bool debug_logging_enabled_ = false;
     };
 
     using SolverCreator = std::function<std::unique_ptr<Solver>()>;

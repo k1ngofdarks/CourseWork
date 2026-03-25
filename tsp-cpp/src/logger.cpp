@@ -36,7 +36,10 @@ FileLogger::FileLogger(Config config) : config_(std::move(config)) {
 }
 
 void FileLogger::OnSolverStart(const std::string &solver_name) {
-    WriteTextLine("[INFO] solver=" + solver_name + " event=start");
+    if (!config_.debug_enabled) {
+        return;
+    }
+    WriteTextLine("[DEBUG] solver=" + solver_name + " event=start");
 }
 
 void FileLogger::OnImprovement(const std::string &solver_name,
