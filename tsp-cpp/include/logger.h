@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -100,6 +101,7 @@ private:
     Config config_;
     std::mutex mutex_;
     std::unordered_map<std::string, SolverState> solver_states_;
+    std::chrono::steady_clock::time_point session_started_at_{std::chrono::steady_clock::now()};
 
     void WriteTextLine(const std::string &line);
     void WriteCsvLine(const std::string &solver_name,
@@ -124,6 +126,12 @@ public:
     void ReportCandidate(const std::vector<int> &route, double route_length);
     void TickPeriodic(const std::vector<int> &route);
     void Debug(const std::string &message) const;
+    template<typename... Args>
+    void DebugValues(Args &&...args) const {
+        std::ostringstream ss;
+        (ss << ... << args);
+        Debug(ss.str());
+    }
 
 private:
     std::shared_ptr<ILogger> logger_;

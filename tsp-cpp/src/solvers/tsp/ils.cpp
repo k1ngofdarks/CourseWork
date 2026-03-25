@@ -37,10 +37,9 @@ namespace tsp {
             auto nearest = tsp::SolverFactory::Create("nearest");
             auto opt_2 = tsp::SolverFactory::CreateConfigured("2-opt",
                                                               {std::make_pair("time", std::to_string(time_limit))});
-            auto nested_logger = std::make_shared<tsp::NullLogger>();
-            nearest->SetLogger(nested_logger);
+            nearest->SetLogger(logger_);
             nearest->SetStopToken(stop_token_);
-            opt_2->SetLogger(nested_logger);
+            opt_2->SetLogger(logger_);
             opt_2->SetStopToken(stop_token_);
             nearest->Solve(route);
             opt_2->Solve(route);

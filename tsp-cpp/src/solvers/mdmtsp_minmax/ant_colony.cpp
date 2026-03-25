@@ -36,10 +36,9 @@ namespace mdmtsp_minmax {
 //            FILE *fp = freopen("/home/nikita/CLionProjects/CourseWork/tsp-cpp/my_logs.txt", "w", stdout);
             const auto &inst = Instance::GetInstance();
             tsp::SolverLogScope log_scope(logger_, stop_token_, "mdmtsp.ant");
-            auto nested_logger = std::make_shared<tsp::NullLogger>();
-            two_opt_solver->SetLogger(nested_logger);
+            two_opt_solver->SetLogger(logger_);
             two_opt_solver->SetStopToken(stop_token_);
-            nn_solver->SetLogger(nested_logger);
+            nn_solver->SetLogger(logger_);
             nn_solver->SetStopToken(stop_token_);
             int n = inst.GetN();
             std::vector<int> customers = inst.GetCustomers();

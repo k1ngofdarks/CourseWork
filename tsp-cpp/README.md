@@ -135,7 +135,14 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 - Улучшения между срезами используются для обновления внутреннего состояния best, но не спамят `INFO` в файл.
 - Маршрут не пишется в текстовый/CSV лог (хранится только в памяти логера как текущий best-route).
 - `DEBUG` сообщения пишутся только при `--debug true`.
-- Вложенные внутренние солверы (например, `2-opt` внутри `ils`) используют `NullLogger`, чтобы не сбивать таймлайн верхнего солвера в CSV.
+- Вложенные солверы тоже логируют, но временная шкала единая (от старта logger-сессии), поэтому время в CSV согласовано.
+
+Мини-дока по функциям логера (`SolverLogScope`):
+- `ReportCandidate(route, length)` — сообщить кандидата; если лучше предыдущего, обновится best в памяти логера.
+- `TickPeriodic(route)` — при достижении `log_interval` пишет `periodic_best` в log/csv.
+- `StopRequested()` — проверка graceful stop через `IStopToken`.
+- `Debug(message)` — строковый debug лог.
+- `DebugValues(a, b, c, ...)` — debug как `printf`-стиль (конкатенация любых значений через stream).
 
 Пример:
 

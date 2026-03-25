@@ -43,17 +43,22 @@ void FileLogger::OnImprovement(const std::string &solver_name,
                                double best_length,
                                double found_at_seconds,
                                const std::vector<int> &route) {
+    (void) found_at_seconds;
+    const auto now = std::chrono::steady_clock::now();
+    const double global_elapsed =
+        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(now - session_started_at_).count()) /
+        1e3;
     std::lock_guard lock(mutex_);
     auto &state = solver_states_[solver_name];
     if (!state.has_best || best_length < state.best_length) {
         state.has_best = true;
         state.best_length = best_length;
-        state.best_found_at_seconds = found_at_seconds;
+        state.best_found_at_seconds = global_elapsed;
         state.best_route = route;
         if (config_.debug_enabled) {
             std::ostringstream ss;
             ss << "[DEBUG] solver=" << solver_name << " event=improvement best=" << std::fixed
-               << std::setprecision(6) << best_length << " found_at=" << found_at_seconds;
+               << std::setprecision(6) << best_length << " found_at=" << global_elapsed;
             if (config_.console_enabled) {
                 std::cerr << ss.str() << "\n";
             }
@@ -69,26 +74,31 @@ void FileLogger::OnPeriodicBest(const std::string &solver_name,
                                 double best_length,
                                 double elapsed_seconds,
                                 const std::vector<int> &route) {
+    (void) elapsed_seconds;
+    const auto now = std::chrono::steady_clock::now();
+    const double global_elapsed =
+        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(now - session_started_at_).count()) /
+        1e3;
     double stored_best = best_length;
-    double found_at = elapsed_seconds;
+    double found_at = global_elapsed;
     {
         std::lock_guard lock(mutex_);
         auto &state = solver_states_[solver_name];
         if (!state.has_best || best_length < state.best_length) {
             state.has_best = true;
             state.best_length = best_length;
-            state.best_found_at_seconds = elapsed_seconds;
+            state.best_found_at_seconds = global_elapsed;
             state.best_route = route;
         }
         stored_best = state.best_length;
         found_at = state.best_found_at_seconds;
-        state.history.push_back({elapsed_seconds, state.best_length, state.best_found_at_seconds});
+        state.history.push_back({global_elapsed, state.best_length, state.best_found_at_seconds});
     }
     std::ostringstream ss;
     ss << "[INFO] solver=" << solver_name << " event=periodic_best best=" << std::fixed << std::setprecision(6)
-       << stored_best << " elapsed=" << elapsed_seconds << " best_found_at=" << found_at;
+       << stored_best << " elapsed=" << global_elapsed << " best_found_at=" << found_at;
     WriteTextLine(ss.str());
-    WriteCsvLine(solver_name, "periodic_best", stored_best, elapsed_seconds, found_at);
+    WriteCsvLine(solver_name, "periodic_best", stored_best, global_elapsed, found_at);
 }
 
 void FileLogger::Debug(const std::string &solver_name, const std::string &message) {
