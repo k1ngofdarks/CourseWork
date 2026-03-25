@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <algorithm>
 #include <limits>
@@ -22,6 +23,7 @@ public:
     void Solve(std::vector<int> &route) override {
         const Instance &inst = Instance::GetInstance();
         const int n = inst.GetN();
+        SolverLogScope log_scope(logger_, stop_token_, "heldkarp");
 
         if (n <= 0 || n > max_n) return;
 
@@ -39,6 +41,10 @@ public:
         dp[idx(1u << s, s)] = 0.0;
 
         for (uint32_t mask = 0; mask < FULL; ++mask) {
+            if (log_scope.StopRequested()) {
+                log_scope.Debug("stop requested");
+                return;
+            }
             if (((mask >> s) & 1u) == 0u) continue;
             for (int j = 0; j < n; ++j) {
                 if (((mask >> j) & 1u) == 0u) continue;
@@ -96,6 +102,7 @@ public:
         new_route.push_back(s);
 
         route.swap(new_route);
+        log_scope.ReportCandidate(route, CalculateRouteLength(route));
     }
 };
 

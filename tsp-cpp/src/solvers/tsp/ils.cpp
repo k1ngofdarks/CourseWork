@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <random>
 #include <chrono>
@@ -31,21 +32,33 @@ namespace tsp {
         void Solve(std::vector<int> &route) override {
             const Instance &inst = Instance::GetInstance();
             auto start = std::chrono::high_resolution_clock::now();
+            SolverLogScope log_scope(logger_, stop_token_, "ils");
 
             auto nearest = tsp::SolverFactory::Create("nearest");
             auto opt_2 = tsp::SolverFactory::CreateConfigured("2-opt",
                                                               {std::make_pair("time", std::to_string(time_limit))});
+            nearest->SetLogger(logger_);
+            nearest->SetStopToken(stop_token_);
+            opt_2->SetLogger(logger_);
+            opt_2->SetStopToken(stop_token_);
             nearest->Solve(route);
             opt_2->Solve(route);
+            log_scope.ReportCandidate(route, inst.RouteLength(route));
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
+                if (log_scope.StopRequested()) {
+                    log_scope.Debug("stop requested");
+                    return;
+                }
                 std::vector<int> new_route = route;
                 KDoubleBridgeMove(new_route, cnt_pert);
 
                 opt_2->Solve(new_route);
                 if (inst.RouteLength(new_route) <= inst.RouteLength(route)) {
                     route = new_route;
+                    log_scope.ReportCandidate(route, inst.RouteLength(route));
                 }
+                log_scope.TickPeriodic(route);
             }
         }
 

@@ -9,6 +9,7 @@ add_subdirectory(src)
 
 add_custom_target(
    extern_lib
+   COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/../LKH-2.0.11/SRC/OBJ
    COMMAND make
    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../LKH-2.0.11
 )

@@ -118,3 +118,52 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 - `route_costs` — длина каждого маршрута
 - `routes` — список маршрутов (в id исходных данных)
 - `time`
+
+### Логирование и graceful stop (TSP + MDMTSP)
+
+Поддерживаются глобальные опции логирования (применяются ко всем `--step`):
+
+- `--log_file <path>` — текстовый лог (`INFO`/`DEBUG`)
+- `--csv_file <path>` — CSV лог событий (`solver,event,best_length,seconds,route`)
+- `--log_interval <seconds>` — запись текущего лучшего решения каждые N секунд
+- `--debug <true|false|1|0>` — включить debug-логи
+- `--console_log <true|false|1|0>` — вывод логов в консоль (`stderr`), по умолчанию `false`
+- `--stop_file <path>` — graceful stop: при появлении файла алгоритмы завершают текущую итерацию и выходят
+
+Пример:
+
+```bash
+python3 run.py \
+  --task tasks/tsp/example1.json \
+  --step nearest \
+  --step 2-opt --time 30 \
+  --log_file logs/tsp.log \
+  --csv_file logs/tsp.csv \
+  --log_interval 5 \
+  --debug true \
+  --console_log false \
+  --stop_file /tmp/tsp.stop
+```
+
+Для MDMTSP Min-Max используются те же параметры:
+
+```bash
+python3 run.py \
+  --task tasks/mdmtsp_minmax/example1.json \
+  --step ant --n_iter 50 \
+  --log_file logs/md.log \
+  --csv_file logs/md.csv \
+  --log_interval 3
+```
+
+### Если падает сборка LKH (`OBJ/*.o: No such file or directory`)
+
+Перед сборкой можно подготовить папку объектных файлов и собрать LKH вручную:
+
+```bash
+cd LKH-2.0.11
+mkdir -p SRC/OBJ
+make all
+```
+
+Также CMake-таргет `extern_lib` теперь автоматически создает `LKH-2.0.11/SRC/OBJ` перед `make`.

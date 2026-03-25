@@ -1,4 +1,5 @@
 #include <solver.h>
+#include <logger.h>
 #include <factory.h>
 #include <instance.h>
 #include <fstream>
@@ -7,6 +8,7 @@
 #include <filesystem>
 #include <chrono>
 #include <iostream>
+#include <iomanip>
 
 
 namespace tsp {
@@ -159,6 +161,11 @@ namespace tsp {
         }
         
         void Solve(std::vector<int>& route) override {
+            SolverLogScope log_scope(logger_, stop_token_, "lkh");
+            if (log_scope.StopRequested()) {
+                log_scope.Debug("stop requested before start");
+                return;
+            }
             std::string tsp_file = GetTempFileName(".tsp");
             std::string par_file = GetTempFileName(".par");
             std::string initial_tour_file = GetTempFileName(".tour");
@@ -185,16 +192,20 @@ namespace tsp {
                 if (result == 0) {
                     if (!ReadOptimizedTour(output_file, route)) {
                         std::cerr << "Warning: Could not read LKH output, keeping original tour\n";
+                        log_scope.Debug("could not parse output tour");
                     }
                 } else {
                     std::cerr << "Warning: LKH execution failed, keeping original tour\n";
+                    log_scope.Debug("lkh process failed");
                 }
                 
             } catch (const std::exception& e) {
                 std::cerr << "LKH Solver error: " << e.what() << ", keeping original tour\n";
+                log_scope.Debug(std::string("exception: ") + e.what());
             }
             
             CleanupFiles(temp_files);
+            log_scope.ReportCandidate(route, CalculateRouteLength(route));
         }
     };
 
