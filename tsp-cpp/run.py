@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -58,6 +59,14 @@ def detect_algorithm_name(cpp_args: List[str]) -> str:
     if not steps:
         return "unknown"
     return " -> ".join(steps)
+
+
+def is_console_log_enabled(cpp_args: List[str]) -> bool:
+    for i, arg in enumerate(cpp_args[:-1]):
+        if arg == "--console_log":
+            val = cpp_args[i + 1].strip().lower()
+            return val in {"1", "true", "yes", "on"}
+    return False
 
 
 def _parse_json_npz_mode(task_json: Dict[str, Any], base_dir: Path, fallback_coords: Path) -> Tuple[str, int, List[int], str, List[int]]:
@@ -182,6 +191,7 @@ def main() -> None:
 
     cpp_args_prepared = False
     algorithm = "unknown"
+    show_solver_logs = is_console_log_enabled(cpp_args)
 
     total_cost = 0.0
     total_time = 0.0
@@ -203,6 +213,8 @@ def main() -> None:
             cpp_args_prepared = True
 
         p = subprocess.run(["build/src/tsp"] + cpp_args, input=payload, text=True, capture_output=True)
+        if show_solver_logs and p.stderr:
+            print(p.stderr, file=sys.stderr, end="")
         if p.returncode != 0:
             raise RuntimeError(p.stderr)
 

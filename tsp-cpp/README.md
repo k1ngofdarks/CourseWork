@@ -124,11 +124,17 @@ python3 run.py --task tasks/mdmtsp_minmax/example1.json --step random --iter 100
 Поддерживаются глобальные опции логирования (применяются ко всем `--step`):
 
 - `--log_file <path>` — текстовый лог (`INFO`/`DEBUG`)
-- `--csv_file <path>` — CSV лог событий (`solver,event,best_length,seconds,route`)
+- `--csv_file <path>` — CSV лог событий (`solver,event,elapsed_seconds,best_length,best_found_at_seconds`)
 - `--log_interval <seconds>` — запись текущего лучшего решения каждые N секунд
 - `--debug <true|false|1|0>` — включить debug-логи
 - `--console_log <true|false|1|0>` — вывод логов в консоль (`stderr`), по умолчанию `false`
 - `--stop_file <path>` — graceful stop: при появлении файла алгоритмы завершают текущую итерацию и выходят
+
+Поведение логера:
+- В файл пишутся только периодические срезы (`periodic_best`) и служебные сообщения старта.
+- Улучшения между срезами используются для обновления внутреннего состояния best, но не спамят `INFO` в файл.
+- Маршрут не пишется в текстовый/CSV лог (хранится только в памяти логера как текущий best-route).
+- `DEBUG` сообщения пишутся только при `--debug true`.
 
 Пример:
 
@@ -167,3 +173,18 @@ make all
 ```
 
 Также CMake-таргет `extern_lib` теперь автоматически создает `LKH-2.0.11/SRC/OBJ` перед `make`.
+
+### Smoke-тест логера
+
+Для проверки режимов логгера без запуска полного TSP можно использовать отдельный бинарник:
+
+```bash
+cmake -S . -B build
+cmake --build build -j4 --target logger_smoke
+./build/src/logger_smoke \
+  --log_file logs/smoke.log \
+  --csv_file logs/smoke.csv \
+  --log_interval 2 \
+  --debug true \
+  --console_log true
+```

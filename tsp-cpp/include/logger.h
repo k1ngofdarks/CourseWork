@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -57,6 +58,20 @@ private:
 
 class FileLogger final : public ILogger {
 public:
+    struct HistoryPoint {
+        double elapsed_seconds = 0.0;
+        double best_length = std::numeric_limits<double>::infinity();
+        double best_found_at_seconds = 0.0;
+    };
+
+    struct SolverState {
+        double best_length = std::numeric_limits<double>::infinity();
+        double best_found_at_seconds = 0.0;
+        std::vector<int> best_route;
+        std::vector<HistoryPoint> history;
+        bool has_best = false;
+    };
+
     struct Config {
         std::string log_file;
         std::string csv_file;
@@ -81,14 +96,14 @@ public:
 private:
     Config config_;
     std::mutex mutex_;
+    std::unordered_map<std::string, SolverState> solver_states_;
 
-    std::string SerializeRoute(const std::vector<int> &route) const;
     void WriteTextLine(const std::string &line);
     void WriteCsvLine(const std::string &solver_name,
                       const std::string &event,
                       double best_length,
-                      double seconds,
-                      const std::vector<int> &route);
+                      double elapsed_seconds,
+                      double best_found_at_seconds);
 };
 
 class SolverLogScope {
@@ -97,6 +112,7 @@ public:
                    std::shared_ptr<IStopToken> stop_token,
                    std::string solver_name,
                    double periodic_interval_seconds = 5.0);
+    ~SolverLogScope();
 
     bool StopRequested() const;
     void ReportCandidate(const std::vector<int> &route, double route_length);
@@ -110,6 +126,7 @@ private:
     std::chrono::steady_clock::time_point started_at_;
     std::chrono::steady_clock::time_point last_periodic_log_at_;
     double best_length_ = 1e300;
+    std::vector<int> best_route_;
     double periodic_interval_seconds_ = 5.0;
     bool has_best_ = false;
 };
