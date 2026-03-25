@@ -29,6 +29,7 @@ public:
                                 double elapsed_seconds,
                                 const std::vector<int> &route) = 0;
     virtual void Debug(const std::string &solver_name, const std::string &message) = 0;
+    virtual double PeriodicIntervalSeconds() const = 0;
     virtual ~ILogger() = default;
 };
 
@@ -38,6 +39,7 @@ public:
     void OnImprovement(const std::string &, double, double, const std::vector<int> &) override {}
     void OnPeriodicBest(const std::string &, double, double, const std::vector<int> &) override {}
     void Debug(const std::string &, const std::string &) override {}
+    double PeriodicIntervalSeconds() const override { return 5.0; }
 };
 
 class NullStopToken final : public IStopToken {
@@ -92,6 +94,7 @@ public:
                         double elapsed_seconds,
                         const std::vector<int> &route) override;
     void Debug(const std::string &solver_name, const std::string &message) override;
+    double PeriodicIntervalSeconds() const override { return config_.periodic_interval_seconds; }
 
 private:
     Config config_;
@@ -108,10 +111,13 @@ private:
 
 class SolverLogScope {
 public:
+    // Creates a lightweight runtime scope for one solver execution.
+    // It tracks in-memory best candidate and pushes periodic snapshots to ILogger.
     SolverLogScope(std::shared_ptr<ILogger> logger,
                    std::shared_ptr<IStopToken> stop_token,
                    std::string solver_name,
-                   double periodic_interval_seconds = 5.0);
+                   double periodic_interval_seconds = -1.0,
+                   bool periodic_enabled = true);
     ~SolverLogScope();
 
     bool StopRequested() const;
@@ -128,6 +134,7 @@ private:
     double best_length_ = 1e300;
     std::vector<int> best_route_;
     double periodic_interval_seconds_ = 5.0;
+    bool periodic_enabled_ = true;
     bool has_best_ = false;
 };
 

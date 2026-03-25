@@ -33,7 +33,8 @@ namespace tsp {
             SolverLogScope log_scope(logger_, stop_token_, "gls");
 
             auto nearest = tsp::SolverFactory::Create("nearest");
-            nearest->SetLogger(logger_);
+            auto nested_logger = std::make_shared<tsp::NullLogger>();
+            nearest->SetLogger(nested_logger);
             nearest->SetStopToken(stop_token_);
             nearest->Solve(route);
             int n = static_cast<int>(route.size()) - 1;

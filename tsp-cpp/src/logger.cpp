@@ -128,30 +128,28 @@ void FileLogger::WriteCsvLine(const std::string &solver_name,
 SolverLogScope::SolverLogScope(std::shared_ptr<ILogger> logger,
                                std::shared_ptr<IStopToken> stop_token,
                                std::string solver_name,
-                               double periodic_interval_seconds)
+                               double periodic_interval_seconds,
+                               bool periodic_enabled)
     : logger_(std::move(logger)),
       stop_token_(std::move(stop_token)),
       solver_name_(std::move(solver_name)),
       started_at_(std::chrono::steady_clock::now()),
       last_periodic_log_at_(started_at_),
-      periodic_interval_seconds_(periodic_interval_seconds) {
+      periodic_interval_seconds_(periodic_interval_seconds),
+      periodic_enabled_(periodic_enabled) {
     if (!logger_) {
         logger_ = std::make_shared<NullLogger>();
     }
     if (!stop_token_) {
         stop_token_ = std::make_shared<NullStopToken>();
     }
+    if (periodic_interval_seconds_ <= 0) {
+        periodic_interval_seconds_ = logger_->PeriodicIntervalSeconds();
+    }
     logger_->OnSolverStart(solver_name_);
 }
 
 SolverLogScope::~SolverLogScope() {
-    if (!has_best_) {
-        return;
-    }
-    const auto now = std::chrono::steady_clock::now();
-    const double elapsed =
-        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(now - started_at_).count()) / 1e3;
-    logger_->OnPeriodicBest(solver_name_, best_length_, elapsed, best_route_);
 }
 
 bool SolverLogScope::StopRequested() const {
@@ -172,7 +170,7 @@ void SolverLogScope::ReportCandidate(const std::vector<int> &route, double route
 }
 
 void SolverLogScope::TickPeriodic(const std::vector<int> &route) {
-    if (!has_best_) {
+    if (!periodic_enabled_ || !has_best_) {
         return;
     }
     const auto now = std::chrono::steady_clock::now();
