@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <chrono>
 #include <iostream>
+#include <cmath>
 
 
 namespace tsp {
@@ -34,20 +35,26 @@ namespace tsp {
                 throw std::runtime_error("Cannot create TSPLIB file: " + filename);
             }
             
-            const auto& latitudes = inst.GetLatitudes();
-            const auto& longitudes = inst.GetLongitudes();
-            
-            // TSPLIB header for GEOM format (geographical coordinates in decimal degrees)
+            // Always export explicit matrix. This works for all instance formats
+            // (matrix/coordinates/latlon) and avoids depending on stored raw coords.
             file << "NAME: temp_problem\n";
             file << "TYPE: TSP\n";
-            file << "COMMENT: Generated from geographical coordinates\n";
+            file << "COMMENT: Generated from distance matrix\n";
             file << "DIMENSION: " << n << "\n";
-            file << "EDGE_WEIGHT_TYPE: GEOM\n";
-            file << "NODE_COORD_SECTION\n";
-            
+            file << "EDGE_WEIGHT_TYPE: EXPLICIT\n";
+            file << "EDGE_WEIGHT_FORMAT: FULL_MATRIX\n";
+            file << "EDGE_WEIGHT_SECTION\n";
+
             for (int i = 0; i < n; ++i) {
-                file << (i + 1) << " " << std::fixed << std::setprecision(6)
-                     << latitudes[i] << " " << longitudes[i] << "\n";
+                for (int j = 0; j < n; ++j) {
+                    // LKH expects integer weights in TSPLIB matrix mode.
+                    const long long w = static_cast<long long>(std::llround(inst.Distance(i, j)));
+                    file << w;
+                    if (j + 1 < n) {
+                        file << " ";
+                    }
+                }
+                file << "\n";
             }
             
             file << "EOF\n";
