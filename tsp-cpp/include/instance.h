@@ -22,6 +22,8 @@ namespace tsp {
 
         [[nodiscard]] const std::vector<double> &GetLatitudes() const;
         [[nodiscard]] const std::vector<double> &GetLongitudes() const;
+        [[nodiscard]] bool HasCoordinates() const;
+        [[nodiscard]] bool IsGeographicalMetric() const;
 
     private:
         Instance();
@@ -31,6 +33,8 @@ namespace tsp {
         std::vector<std::vector<double>> mat;
         std::vector<double> latitudes;
         std::vector<double> longitudes;
+        bool has_coordinates = false;
+        bool is_geographical_metric = false;
     };
 } // namespace tsp
 

@@ -100,6 +100,12 @@ namespace tsp {
 
         std::string metric = json.value("metric", "euclidean");
         if (metric == "euclidean") {
+            lat_out.resize(n_out);
+            lon_out.resize(n_out);
+            for (int i = 0; i < n_out; ++i) {
+                lat_out[i] = points[i][0];
+                lon_out[i] = points[i][1];
+            }
             return CalculateEuclideanDistances(points);
         }
         if (metric == "sphere") {
@@ -119,17 +125,23 @@ namespace tsp {
         auto json = nlohmann::json::parse(ReadAllStdin());
         if (json.contains("matrix")) {
             mat = ParseMatrix(json, n);
+            has_coordinates = false;
+            is_geographical_metric = false;
             return;
         }
 
         if (json.contains("coordinates")) {
             mat = ParseCoordinates(json, n, latitudes, longitudes);
+            has_coordinates = true;
+            is_geographical_metric = (json.value("metric", "euclidean") == "sphere");
             return;
         }
 
         if (json.contains("latlon")) {
             n = json["n"];
             mat = ParseLatLonDistances(json, latitudes, longitudes);
+            has_coordinates = true;
+            is_geographical_metric = true;
             return;
         }
 
@@ -159,6 +171,14 @@ namespace tsp {
 
     const std::vector<double>& Instance::GetLongitudes() const {
         return longitudes;
+    }
+
+    bool Instance::HasCoordinates() const {
+        return has_coordinates;
+    }
+
+    bool Instance::IsGeographicalMetric() const {
+        return is_geographical_metric;
     }
 
 } // namespace tsp
