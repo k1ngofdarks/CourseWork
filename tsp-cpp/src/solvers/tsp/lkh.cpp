@@ -25,7 +25,17 @@ namespace tsp {
         int patching_a = 2;
         int max_candidates = 30;
         int trace_level = 0;
+        bool use_geo_coordinates = false;
         std::string lkh_path = "../LKH-2.0.11/LKH";  // Path to LKH executable
+
+        double ToTSPLIBGeoCoordinate(double decimal_degrees) const {
+            const double sign = decimal_degrees < 0 ? -1.0 : 1.0;
+            const double abs_value = std::abs(decimal_degrees);
+            const int deg = static_cast<int>(abs_value);
+            const double min_decimal = abs_value - static_cast<double>(deg);
+            const double tsplib = static_cast<double>(deg) + (3.0 * min_decimal / 5.0);
+            return sign * tsplib;
+        }
         
         std::string GetTempFileName(const std::string& suffix) {
             auto now = std::chrono::high_resolution_clock::now();
@@ -43,15 +53,14 @@ namespace tsp {
                 throw std::runtime_error("Cannot create TSPLIB file: " + filename);
             }
             
-            if (inst.HasCoordinates()) {
+            if (inst.HasCoordinates() && !inst.IsGeographicalMetric()) {
                 const auto &x = inst.GetLatitudes();
                 const auto &y = inst.GetLongitudes();
-                const bool is_geo = inst.IsGeographicalMetric();
                 file << "NAME: temp_problem\n";
                 file << "TYPE: TSP\n";
-                file << "COMMENT: Generated from coordinates\n";
+                file << "COMMENT: Generated from euclidean coordinates\n";
                 file << "DIMENSION: " << n << "\n";
-                file << "EDGE_WEIGHT_TYPE: " << (is_geo ? "GEO" : "EUC_2D") << "\n";
+                file << "EDGE_WEIGHT_TYPE: EUC_2D\n";
                 file << "NODE_COORD_SECTION\n";
                 for (int i = 0; i < n; ++i) {
                     file << (i + 1) << " " << std::fixed << std::setprecision(10)
@@ -62,7 +71,26 @@ namespace tsp {
                 return;
             }
 
-            // Fallback for matrix-only input.
+            if (inst.HasCoordinates() && inst.IsGeographicalMetric() && use_geo_coordinates) {
+                const auto &lat = inst.GetLatitudes();
+                const auto &lon = inst.GetLongitudes();
+                file << "NAME: temp_problem\n";
+                file << "TYPE: TSP\n";
+                file << "COMMENT: Generated from GEO coordinates\n";
+                file << "DIMENSION: " << n << "\n";
+                file << "EDGE_WEIGHT_TYPE: GEO\n";
+                file << "NODE_COORD_SECTION\n";
+                for (int i = 0; i < n; ++i) {
+                    file << (i + 1) << " " << std::fixed << std::setprecision(10)
+                         << ToTSPLIBGeoCoordinate(lat[i]) << " "
+                         << ToTSPLIBGeoCoordinate(lon[i]) << "\n";
+                }
+                file << "EOF\n";
+                file.close();
+                return;
+            }
+
+            // Fallback for matrix input and (by default) geographical input.
             file << "NAME: temp_problem\n";
             file << "TYPE: TSP\n";
             file << "COMMENT: Generated from distance matrix\n";
@@ -206,6 +234,9 @@ namespace tsp {
             if (opts.count("trace_level")) {
                 trace_level = std::max(0, std::stoi(opts.at("trace_level")));
             }
+            if (opts.count("geo_mode")) {
+                use_geo_coordinates = (opts.at("geo_mode") == "geo");
+            }
             if (opts.count("lkh_path")) {
                 lkh_path = opts.at("lkh_path");
             }
@@ -218,6 +249,7 @@ namespace tsp {
                     ", patching_a=" + std::to_string(patching_a) +
                     ", max_candidates=" + std::to_string(max_candidates) +
                     ", trace_level=" + std::to_string(trace_level) +
+                    ", geo_mode=" + std::string(use_geo_coordinates ? "geo" : "explicit") +
                     ", lkh_path=" + lkh_path);
         }
 
