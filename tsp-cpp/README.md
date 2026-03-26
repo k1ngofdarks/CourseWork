@@ -85,6 +85,57 @@ python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --tim
 
 `TODO: fix in task_003` 
 
+### Логирование (INFO/DEBUG)
+
+Логирование работает и для `tsp`, и для `mdmtsp_minmax`.
+
+Есть два уровня:
+- `info` — высокоуровневая сводка: старт запуска, результаты run'ов, новые лучшие решения, итоговые средние метрики, время работы.
+- `debug` — всё из `info` плюс технические детали: подготовленные аргументы, сообщения валидации, превью маршрутов, debug-события из C++ раннера.
+
+Параметры запуска:
+- `--log_mode info|debug` — режим логирования, по умолчанию `info`.
+- `--log_interval N` — раз в сколько секунд писать snapshot C++ логгера в файл, по умолчанию `5`.
+
+Примеры:
+```bash
+python3 run.py --task tasks/tsp/example3.json --log_mode info --step nearest
+python3 run.py --task tasks/tsp/example3.json --log_mode debug --log_interval 2 --step nearest
+python3 run.py --task tasks/mdmtsp_minmax/example1.json --log_mode debug --step nn
+```
+
+Что происходит под капотом:
+- Python-обвязка (`run.py`) пишет консольный лог запуска.
+- C++ логгер пишет файл в `logs/{task_type}_{task_name}.log`.
+- Каждое новое найденное решение передаётся в логгер через `AddNewSolution(...)`.
+- Для лучшего решения дополнительно сохраняются артефакты в `logs/`:
+  - `{task_type}_{task_name}_best_solution_payload.json`
+  - `{task_type}_{task_name}_best_route.json` или `{task_type}_{task_name}_best_routes.json`
+- Логгер хранит:
+  - текущее лучшее значение целевой функции,
+  - историю улучшений,
+  - последнее найденное решение,
+  - маршрут лучшего найденного решения.
+
+Важно:
+- маршрут сохраняется внутри логгера, но не печатается в лог-файл;
+- для `tsp` хранится один маршрут;
+- для `mdmtsp_minmax` хранится список маршрутов;
+- сами алгоритмы при этом не меняются, логгер только наблюдает за решениями.
+
+Что есть в snapshot-файле:
+- номер snapshot;
+- имя задачи и тип задачи;
+- elapsed time;
+- текущее лучшее значение метрики;
+- история улучшений best solution;
+- список `INFO` событий;
+- список `DEBUG` событий, если выбран режим `debug`.
+
+Типичные файлы:
+- `logs/tsp_example3.log`
+- `logs/mdmtsp_minmax_example1.log`
+
 
 ### MDMTSP Min-Max
 

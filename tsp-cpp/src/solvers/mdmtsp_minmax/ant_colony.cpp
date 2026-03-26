@@ -1,5 +1,6 @@
 #include <solver.h>
 #include <factory.h>
+#include <logger.h>
 
 #include <algorithm>
 #include <random>
@@ -29,15 +30,22 @@ namespace mdmtsp_minmax {
             if (opts.contains("start_pheromone_level"))
                 start_pheromone_level = std::stold(opts.at("start_pheromone_level"));
             if (opts.contains("degradation_level")) degradation_level = std::stold(opts.at("degradation_level"));
+            app::Logger::GetInstance().AddDebug(
+                    "mdmtsp ant configured: n_iter=" + std::to_string(n_iter) +
+                    ", n_ants=" + std::to_string(n_ants) +
+                    ", n_candidates=" + std::to_string(n_candidates));
         }
 
         void Solve(std::vector<std::vector<int>> &routes) override {
 //            FILE *fp = freopen("/home/nikita/CLionProjects/CourseWork/tsp-cpp/my_logs.txt", "w", stdout);
+            auto &logger = app::Logger::GetInstance();
             const auto &inst = Instance::GetInstance();
             int n = inst.GetN();
             std::vector<int> customers = inst.GetCustomers();
             std::vector<std::vector<int>> result_routes;
             long double result_length = 1e18;
+            logger.AddInfo("mdmtsp ant: start solve, n=" + std::to_string(n) +
+                           ", n_iter=" + std::to_string(n_iter));
 
             if (start_pheromone_level <= 0) {
                 std::vector<std::vector<int>> nn_routes;
@@ -106,6 +114,8 @@ namespace mdmtsp_minmax {
                     if (curr_length < result_length) {
                         result_length = curr_length;
                         result_routes = curr_routes;
+                        logger.AddDebug("mdmtsp ant: improved max_len=" + std::to_string(static_cast<double>(result_length)) +
+                                        ", epoch=" + std::to_string(epoch_id + 1));
                     }
                 }
 
@@ -123,6 +133,7 @@ namespace mdmtsp_minmax {
                 }
             }
             std::swap(routes, result_routes);
+            logger.AddInfo("mdmtsp ant: finish solve, max_len=" + std::to_string(static_cast<double>(result_length)));
         }
 
     private:
