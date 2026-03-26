@@ -17,6 +17,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Solve TSP / MDMTSP(min-max) from TXT or JSON task.")
     p.add_argument("--task", type=str, required=True, help="Path to task txt/json.")
     p.add_argument("--coords", type=str, default="World_TSP.npz", help="Default NPZ path for txt task mode.")
+    p.add_argument("--log_mode", type=str, default="info", choices=["info", "debug"], help="Logger mode for C++ solver.")
+    p.add_argument("--log_interval", type=int, default=5, help="Periodic logger flush interval (seconds).")
     return p.parse_known_args()
 
 
@@ -166,6 +168,15 @@ def ensure_problem_arg(cpp_args: List[str], problem: str) -> List[str]:
     return ["--problem", problem] + cpp_args
 
 
+def ensure_key_arg(cpp_args: List[str], key: str, value: str) -> List[str]:
+    flag = f"--{key}"
+    for i, arg in enumerate(cpp_args[:-1]):
+        if arg == flag:
+            cpp_args[i + 1] = value
+            return cpp_args
+    return [flag, value] + cpp_args
+
+
 def main() -> None:
     args, cpp_args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -198,6 +209,9 @@ def main() -> None:
 
         if not cpp_args_prepared:
             cpp_args = ensure_problem_arg(cpp_args, problem)
+            cpp_args = ensure_key_arg(cpp_args, "task_name", task_path.stem)
+            cpp_args = ensure_key_arg(cpp_args, "log_mode", args.log_mode)
+            cpp_args = ensure_key_arg(cpp_args, "log_interval", str(max(1, args.log_interval)))
             recompiles_if_necessary()
             algorithm = detect_algorithm_name(cpp_args)
             cpp_args_prepared = True

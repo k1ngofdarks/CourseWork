@@ -85,6 +85,46 @@ python3 run.py --task tasks/task_001.txt --coords World_TSP.npz --step lkh --tim
 
 `TODO: fix in task_003` 
 
+### Логирование (INFO/DEBUG)
+
+- Логгер встроен в C++ раннер как singleton и поддерживает режимы:
+  - `info` — только базовые события и метрики,
+  - `debug` — дополнительно debug-сообщения.
+- Логгер принимает каждое новое решение через `AddNewSolution` (решение может быть не оптимальным), хранит историю улучшений и текущее лучшее значение целевой функции.
+- Маршрут в лог не пишется (только метрики).
+- Каждые `N` секунд пишется snapshot в файл `logs/{task_type}_{task_name}.log`.
+
+Параметры:
+```bash
+python3 run.py --task ... --log_mode info --log_interval 5 --step nearest
+python3 run.py --task ... --log_mode debug --log_interval 2 --step random --iter 1000
+```
+
+#### API логгера (C++)
+- `Configure(task_type, task_name, mode, flush_interval_sec)` — инициализирует логгер и запускает периодическую запись.
+- `AddInfo(message)` — пишет событие уровня INFO.
+- `AddDebug(message)` — пишет событие DEBUG (только в режиме `debug`).
+- `AddNewSolution(source, objective_value)` — регистрирует очередное решение, обновляет текущее лучшее и историю улучшений.
+- `Shutdown()` — завершает фонового воркера и делает финальный flush.
+
+#### Что логируют алгоритмы
+- `ils` (TSP): INFO при улучшении текущего best, DEBUG по итерациям (каждые 50 шагов).
+- `random` (MDMTSP Min-Max): INFO при улучшении текущего `best_max`, DEBUG по итерациям (каждые 100 шагов).
+
+#### Пример вида лога
+```text
+===== SNAPSHOT 2026-03-25 22:30:00 =====
+best_objective=1234.56
+improvements_count=3
+  * 2026-03-25 22:29:58 | tsp_step_1 | 1450.1
+  * 2026-03-25 22:29:59 | ils | 1300.4
+  * 2026-03-25 22:30:00 | ils | 1234.56
+events:
+  [INFO] 2026-03-25 22:29:58 (+0.001s) | Logger started for tsp/task_001 (interval=2s)
+  [INFO] 2026-03-25 22:29:59 (+1.233s) | [ils] improved at iter=12, best=1300.400000
+  [DEBUG] 2026-03-25 22:30:00 (+2.104s) | [ils] iter=50, candidate=1310.200000, best=1300.400000
+```
+
 
 ### MDMTSP Min-Max
 

@@ -1,6 +1,7 @@
 #include <solver.h>
 #include <factory.h>
 #include <instance.h>
+#include <logger.h>
 
 #include <algorithm>
 #include <limits>
@@ -20,6 +21,7 @@ namespace mdmtsp_minmax {
 
         void Solve(std::vector<std::vector<int>> &routes) override {
             const auto &inst = Instance::GetInstance();
+            auto &logger = app::Logger::GetInstance();
             const auto &depots = inst.GetDepots();
             auto customers = inst.GetCustomers();
 
@@ -47,6 +49,13 @@ namespace mdmtsp_minmax {
                 if (cur_max < best_max) {
                     best_max = cur_max;
                     best_routes = cur;
+                    logger.AddInfo("[mdmtsp_random] improved at iter=" + std::to_string(it) +
+                                   ", best_max=" + std::to_string(best_max));
+                }
+                if (it % 100 == 0) {
+                    logger.AddDebug("[mdmtsp_random] iter=" + std::to_string(it) +
+                                    ", candidate_max=" + std::to_string(cur_max) +
+                                    ", best_max=" + std::to_string(best_max));
                 }
             }
 
