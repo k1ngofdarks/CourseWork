@@ -1,22 +1,19 @@
 #include <solver.h>
 #include <factory.h>
 #include <logger.h>
-#include <random>
 #include <chrono>
 #include <exception>
 #include <algorithm>
+#include <cmath>
 
 namespace tsp {
     class TabuSearch : public Solver { // NOLINT
     public:
         double time_limit = -1;
         size_t max_iter = 0;
-        std::mt19937 rnd;
         int k_opt = 3;
         int tenure = -1;
-        int neighborhood_size = 500;
-        int look_ahead = 40;
-        double max_worsen_ratio = 0.03;
+        int look_ahead = 40; // used for restricted 3-opt neighborhood
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) time_limit = std::stod(opts.at("time"));
@@ -31,15 +28,9 @@ namespace tsp {
                     throw std::invalid_argument("k_opt must be 2 or 3");
                 }
             }
-            if (opts.contains("neighbor")) neighborhood_size = std::stoi(opts.at("neighbor"));
             if (opts.contains("look_ahead")) look_ahead = std::stoi(opts.at("look_ahead"));
-            if (opts.contains("max_worsen_ratio")) max_worsen_ratio = std::stod(opts.at("max_worsen_ratio"));
-            std::random_device rd;
-            rnd.seed(rd());
             app::Logger::GetInstance().AddDebug("tabu search: k_opt=" + std::to_string(k_opt) +
-                                                ", neighborhood=" + std::to_string(neighborhood_size) +
-                                                ", look_ahead=" + std::to_string(look_ahead) +
-                                                ", max_worsen_ratio=" + std::to_string(max_worsen_ratio));
+                                                ", look_ahead=" + std::to_string(look_ahead));
         }
 
         void Solve(std::vector<int> &route) override {
@@ -67,29 +58,20 @@ namespace tsp {
             }
 
             for (size_t iter = 0; (iter < max_iter || max_iter == 0) &&
-                                     (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter) {
-
-                Move best_move;
-
-                for (size_t s = 0; s < neighborhood_size; ++s) {
-                    Move candidate;
-                    if (k_opt == 2) {
-                        candidate = try2optLocal(route, inst);
-                    } else {
-                        candidate = try3optLocal(route, inst);
-                    }
-                    if (IsAcceptable(candidate, route, tabu_matrix, iter, current_len, best_len) &&
-                        candidate.delta < best_move.delta) {
-                        best_move = candidate;
-                    }
+                                 (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter) {
+                Move best_improving;
+                Move best_worsening;
+                if (k_opt == 2) {
+                    Enumerate2Opt(route, inst, tabu_matrix, iter, current_len, best_len, best_improving, best_worsening);
+                } else {
+                    Enumerate3OptRestricted(route, inst, tabu_matrix, iter, current_len, best_len, best_improving, best_worsening);
                 }
 
-                if (!best_move.isValid()) break;
+                Move best_move = best_improving.isValid() ? best_improving : best_worsening;
 
-                const double max_worsen = std::max(1.0, current_len * max_worsen_ratio);
-                if (best_move.delta > max_worsen) {
-                    logger.AddDebug("tabu search: skip too bad move, delta=" + std::to_string(best_move.delta));
-                    continue;
+                if (!best_move.isValid()) break;
+                if (!best_improving.isValid() && best_worsening.isValid() && iter % 100 == 0) {
+                    logger.AddDebug("tabu search: local optimum reached, apply least worsening delta=" + std::to_string(best_move.delta));
                 }
 
                 ApplyMove(route, best_move);
@@ -119,48 +101,64 @@ namespace tsp {
             bool isValid() const { return i != -1; }
         };
 
-        Move try2optLocal(const std::vector<int>& route, const Instance& inst) {
-            int n = inst.GetN();
-            if (n < 4) return {};
-            std::uniform_int_distribution<int> i_dist(0, n - 3);
-            int i = i_dist(rnd);
-            int j_hi = std::min(n - 1, i + std::max(2, look_ahead));
-            if (j_hi - i < 2) return {};
-            std::uniform_int_distribution<int> j_dist(i + 2, j_hi);
-            int j = j_dist(rnd);
-            if (i == 0 && j == n - 1) return {};
-
-            double delta = inst.Distance(route[i], route[j]) +
-                           inst.Distance(route[i+1], route[j+1]) -
-                           inst.Distance(route[i], route[i+1]) -
-                           inst.Distance(route[j], route[j+1]);
-            return {i, j, -1, 2, 0, delta};
+        static double Delta2Opt(const std::vector<int>& route, const Instance& inst, int i, int j) {
+            return inst.Distance(route[i], route[j]) +
+                   inst.Distance(route[i + 1], route[j + 1]) -
+                   inst.Distance(route[i], route[i + 1]) -
+                   inst.Distance(route[j], route[j + 1]);
         }
 
-        Move try3optLocal(const std::vector<int>& route, const Instance& inst) {
-            int n = (int)inst.GetN();
-            if (n < 6) return {};
-            std::uniform_int_distribution<int> i_dist(0, n - 5);
-            int i = i_dist(rnd);
-            int j_hi = std::min(n - 3, i + std::max(2, look_ahead));
-            if (j_hi - i < 2) return {};
-            std::uniform_int_distribution<int> j_dist(i + 2, j_hi);
-            int j = j_dist(rnd);
-            int k_hi = std::min(n - 1, j + std::max(2, look_ahead));
-            if (k_hi - j < 2) return {};
-            std::uniform_int_distribution<int> k_dist(j + 2, k_hi);
-            int k = k_dist(rnd);
-            if (i == 0 && k == n - 1) return {};
+        static double Delta3OptCase4(const std::vector<int>& route, const Instance& inst, int i, int j, int k) {
+            const double d_old = inst.Distance(route[i], route[i + 1]) +
+                                 inst.Distance(route[j], route[j + 1]) +
+                                 inst.Distance(route[k], route[k + 1]);
+            const double d_new = inst.Distance(route[i], route[j + 1]) +
+                                 inst.Distance(route[k], route[i + 1]) +
+                                 inst.Distance(route[j], route[k + 1]);
+            return d_new - d_old;
+        }
 
-            double d_old = inst.Distance(route[i], route[i+1]) +
-                           inst.Distance(route[j], route[j+1]) +
-                           inst.Distance(route[k], route[k+1]);
+        static void RegisterCandidate(const Move& candidate, Move& best_improving, Move& best_worsening) {
+            if (candidate.delta < -1e-9) {
+                if (candidate.delta < best_improving.delta) best_improving = candidate;
+            } else if (candidate.delta < best_worsening.delta) {
+                best_worsening = candidate;
+            }
+        }
 
-            double d_new = inst.Distance(route[i], route[j+1]) +
-                           inst.Distance(route[k], route[i+1]) +
-                           inst.Distance(route[j], route[k+1]);
+        void Enumerate2Opt(const std::vector<int>& route, const Instance& inst,
+                           const std::vector<std::vector<size_t>>& tabu, size_t iter,
+                           double curr_len, double best_global,
+                           Move& best_improving, Move& best_worsening) const {
+            const int n = inst.GetN();
+            for (int i = 0; i < n - 1; ++i) {
+                for (int j = i + 2; j < n; ++j) {
+                    if (i == 0 && j == n - 1) continue;
+                    Move candidate{i, j, -1, 2, 0, Delta2Opt(route, inst, i, j)};
+                    if (!IsAcceptable(candidate, route, tabu, iter, curr_len, best_global)) continue;
+                    RegisterCandidate(candidate, best_improving, best_worsening);
+                }
+            }
+        }
 
-            return {i, j, k, 3, 4, d_new - d_old};
+        void Enumerate3OptRestricted(const std::vector<int>& route, const Instance& inst,
+                                     const std::vector<std::vector<size_t>>& tabu, size_t iter,
+                                     double curr_len, double best_global,
+                                     Move& best_improving, Move& best_worsening) const {
+            const int n = inst.GetN();
+            const int window = std::max(2, look_ahead);
+            for (int i = 0; i < n - 5; ++i) {
+                const int j_hi = std::min(n - 3, i + window);
+                for (int j = i + 2; j <= j_hi; ++j) {
+                    const int k_hi = std::min(n - 1, j + window);
+                    for (int k = j + 2; k <= k_hi; ++k) {
+                        if (i == 0 && k == n - 1) continue;
+                        Move candidate{i, j, k, 3, 4, Delta3OptCase4(route, inst, i, j, k)};
+                        if (!IsAcceptable(candidate, route, tabu, iter, curr_len, best_global)) continue;
+                        RegisterCandidate(candidate, best_improving, best_worsening);
+                    }
+                }
+            }
         }
 
         static bool IsAcceptable(const Move& m, const std::vector<int>& route,
