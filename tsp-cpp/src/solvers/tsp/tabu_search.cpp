@@ -14,7 +14,7 @@ namespace tsp {
         int k_opt = 3;
         int tenure = -1;
         int neighborhood_size = 500;
-
+        double max_worsen_ratio = 0.02;
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) time_limit = std::stod(opts.at("time"));
@@ -30,7 +30,12 @@ namespace tsp {
                 }
             }
             if (opts.contains("neighbor")) neighborhood_size = std::stoi(opts.at("neighbor"));
-            app::Logger::GetInstance().AddDebug("tabu search: k_opt=" + std::to_string(k_opt));
+            if (opts.contains("max_worsen_ratio")) max_worsen_ratio = std::stod(opts.at("max_worsen_ratio"));
+            std::random_device rd;
+            rnd.seed(rd());
+            app::Logger::GetInstance().AddDebug("tabu search: k_opt=" + std::to_string(k_opt) +
+                                                ", neighborhood=" + std::to_string(neighborhood_size) +
+                                                ", max_worsen_ratio=" + std::to_string(max_worsen_ratio));
         }
 
         void Solve(std::vector<int> &route) override {
@@ -63,6 +68,7 @@ namespace tsp {
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter) {
 
                 Move best_move;
+                Move best_improving;
 
                 for (size_t s = 0; s < neighborhood_size; ++s) {
                     Move candidate;
@@ -75,15 +81,28 @@ namespace tsp {
                         if (candidate.delta < best_move.delta) {
                             best_move = candidate;
                         }
+                        if (candidate.delta < -1e-9 && candidate.delta < best_improving.delta) {
+                            best_improving = candidate;
+                        }
                     }
+                }
+
+                if (best_improving.isValid()) {
+                    best_move = best_improving;
                 }
 
                 if (!best_move.isValid()) break;
 
-                ApplyMove(route, best_move);
-                current_len += best_move.delta;
+                const double max_worsen = std::max(1.0, current_len * max_worsen_ratio);
+                if (best_move.delta > max_worsen) {
+                    logger.AddDebug("tabu search: skip too bad move, delta=" + std::to_string(best_move.delta));
+                    break;
+                }
 
-                if (iter % 1000 == 0) logger.AddInfo("len=" + std::to_string(current_len));
+                ApplyMove(route, best_move);
+                current_len = inst.RouteLength(route);
+
+                if (iter % 1000 == 0) logger.AddInfo("curr_len=" + std::to_string(current_len) + ", best_len=" + std::to_string(best_len));
 
                 UpdateTabu(tabu_matrix, route, best_move, iter + tenure);
 
