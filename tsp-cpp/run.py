@@ -372,8 +372,8 @@ def main() -> None:
     logging.debug("Best solution payload saved to logs directory")
 
     if best_solution_payload.get("problem") != "mdmtsp_minmax":
-        out_path = save_solution(task_path, best_route_ids)
-        logging.info(f"Solution TXT saved: {out_path}")
+        #out_path = save_solution(task_path, best_route_ids) ignore TXT
+        #logging.info(f"Solution TXT saved: {out_path}")
         logging.info(f"Best Route (first 25 ids): {best_route_ids[:25]} ...")
     else:
         logging.info(
