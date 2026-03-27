@@ -14,7 +14,7 @@ namespace tsp {
         int k_opt = 3;
         int tenure = -1;
         int neighborhood_size = 500;
-        double max_worsen_ratio = 0.02;
+        size_t stagnation_limit = 2000;
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) time_limit = std::stod(opts.at("time"));
@@ -30,12 +30,12 @@ namespace tsp {
                 }
             }
             if (opts.contains("neighbor")) neighborhood_size = std::stoi(opts.at("neighbor"));
-            if (opts.contains("max_worsen_ratio")) max_worsen_ratio = std::stod(opts.at("max_worsen_ratio"));
+            if (opts.contains("stagnation_limit")) stagnation_limit = std::stoull(opts.at("stagnation_limit"));
             std::random_device rd;
             rnd.seed(rd());
             app::Logger::GetInstance().AddDebug("tabu search: k_opt=" + std::to_string(k_opt) +
                                                 ", neighborhood=" + std::to_string(neighborhood_size) +
-                                                ", max_worsen_ratio=" + std::to_string(max_worsen_ratio));
+                                                ", stagnation_limit=" + std::to_string(stagnation_limit));
         }
 
         void Solve(std::vector<int> &route) override {
@@ -64,11 +64,11 @@ namespace tsp {
                 tenure = static_cast<size_t>(std::sqrt(n)) + 5;
             }
 
+            size_t stagnation = 0;
             for (size_t iter = 0; (iter < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter) {
 
                 Move best_move;
-                Move best_improving;
 
                 for (size_t s = 0; s < neighborhood_size; ++s) {
                     Move candidate;
@@ -77,38 +77,44 @@ namespace tsp {
                     } else {
                         candidate = try3opt(route, dist, inst);
                     }
-                    if (IsAcceptable(candidate, route, tabu_matrix, iter, current_len, best_len)) {
-                        if (candidate.delta < best_move.delta) {
-                            best_move = candidate;
-                        }
-                        if (candidate.delta < -1e-9 && candidate.delta < best_improving.delta) {
-                            best_improving = candidate;
-                        }
+                    if (IsAcceptable(candidate, route, tabu_matrix, iter, current_len, best_len) &&
+                        candidate.delta < best_move.delta) {
+                        best_move = candidate;
                     }
-                }
-
-                if (best_improving.isValid()) {
-                    best_move = best_improving;
                 }
 
                 if (!best_move.isValid()) break;
 
-                const double max_worsen = std::max(1.0, current_len * max_worsen_ratio);
-                if (best_move.delta > max_worsen) {
-                    logger.AddDebug("tabu search: skip too bad move, delta=" + std::to_string(best_move.delta));
-                    break;
+                if (best_move.delta >= -1e-9) {
+                    ++stagnation;
+                    if (stagnation >= stagnation_limit) {
+                        logger.AddDebug("tabu search: stop by stagnation, best_len=" + std::to_string(best_len));
+                        break;
+                    }
+                    route = best_route;
+                    current_len = best_len;
+                    continue;
                 }
 
                 ApplyMove(route, best_move);
                 current_len = inst.RouteLength(route);
-
-                if (iter % 1000 == 0) logger.AddInfo("curr_len=" + std::to_string(current_len) + ", best_len=" + std::to_string(best_len));
-
                 UpdateTabu(tabu_matrix, route, best_move, iter + tenure);
 
                 if (current_len < best_len - 1e-6) {
                     best_len = current_len;
                     best_route = route;
+                    stagnation = 0;
+                } else {
+                    ++stagnation;
+                }
+
+                if (iter % 1000 == 0) {
+                    logger.AddInfo("curr_len=" + std::to_string(current_len) + ", best_len=" + std::to_string(best_len));
+                }
+
+                if (stagnation >= stagnation_limit) {
+                    logger.AddDebug("tabu search: stop by stagnation, best_len=" + std::to_string(best_len));
+                    break;
                 }
             }
             route = best_route;
