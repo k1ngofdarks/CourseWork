@@ -4,6 +4,7 @@
 #include <random>
 #include <chrono>
 #include <exception>
+#include <algorithm>
 
 namespace tsp {
     class TabuSearch : public Solver { // NOLINT
@@ -14,7 +15,8 @@ namespace tsp {
         int k_opt = 3;
         int tenure = -1;
         int neighborhood_size = 500;
-        size_t stagnation_limit = 2000;
+        int look_ahead = 40;
+        double max_worsen_ratio = 0.03;
 
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) time_limit = std::stod(opts.at("time"));
@@ -30,12 +32,14 @@ namespace tsp {
                 }
             }
             if (opts.contains("neighbor")) neighborhood_size = std::stoi(opts.at("neighbor"));
-            if (opts.contains("stagnation_limit")) stagnation_limit = std::stoull(opts.at("stagnation_limit"));
+            if (opts.contains("look_ahead")) look_ahead = std::stoi(opts.at("look_ahead"));
+            if (opts.contains("max_worsen_ratio")) max_worsen_ratio = std::stod(opts.at("max_worsen_ratio"));
             std::random_device rd;
             rnd.seed(rd());
             app::Logger::GetInstance().AddDebug("tabu search: k_opt=" + std::to_string(k_opt) +
                                                 ", neighborhood=" + std::to_string(neighborhood_size) +
-                                                ", stagnation_limit=" + std::to_string(stagnation_limit));
+                                                ", look_ahead=" + std::to_string(look_ahead) +
+                                                ", max_worsen_ratio=" + std::to_string(max_worsen_ratio));
         }
 
         void Solve(std::vector<int> &route) override {
@@ -57,14 +61,11 @@ namespace tsp {
             double best_len = inst.RouteLength(route);
             double current_len = best_len;
 
-            std::uniform_int_distribution<int> dist(0, n - 1);
-
             std::vector<std::vector<size_t>> tabu_matrix(n, std::vector<size_t>(n, 0));
             if (tenure == -1) {
                 tenure = static_cast<size_t>(std::sqrt(n)) + 5;
             }
 
-            size_t stagnation = 0;
             for (size_t iter = 0; (iter < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter) {
 
@@ -73,9 +74,9 @@ namespace tsp {
                 for (size_t s = 0; s < neighborhood_size; ++s) {
                     Move candidate;
                     if (k_opt == 2) {
-                        candidate = try2opt(route, dist, inst);
+                        candidate = try2optLocal(route, inst);
                     } else {
-                        candidate = try3opt(route, dist, inst);
+                        candidate = try3optLocal(route, inst);
                     }
                     if (IsAcceptable(candidate, route, tabu_matrix, iter, current_len, best_len) &&
                         candidate.delta < best_move.delta) {
@@ -85,14 +86,9 @@ namespace tsp {
 
                 if (!best_move.isValid()) break;
 
-                if (best_move.delta >= -1e-9) {
-                    ++stagnation;
-                    if (stagnation >= stagnation_limit) {
-                        logger.AddDebug("tabu search: stop by stagnation, best_len=" + std::to_string(best_len));
-                        break;
-                    }
-                    route = best_route;
-                    current_len = best_len;
+                const double max_worsen = std::max(1.0, current_len * max_worsen_ratio);
+                if (best_move.delta > max_worsen) {
+                    logger.AddDebug("tabu search: skip too bad move, delta=" + std::to_string(best_move.delta));
                     continue;
                 }
 
@@ -103,18 +99,10 @@ namespace tsp {
                 if (current_len < best_len - 1e-6) {
                     best_len = current_len;
                     best_route = route;
-                    stagnation = 0;
-                } else {
-                    ++stagnation;
                 }
 
                 if (iter % 1000 == 0) {
                     logger.AddInfo("curr_len=" + std::to_string(current_len) + ", best_len=" + std::to_string(best_len));
-                }
-
-                if (stagnation >= stagnation_limit) {
-                    logger.AddDebug("tabu search: stop by stagnation, best_len=" + std::to_string(best_len));
-                    break;
                 }
             }
             route = best_route;
@@ -131,15 +119,16 @@ namespace tsp {
             bool isValid() const { return i != -1; }
         };
 
-        Move try2opt(const std::vector<int>& route, std::uniform_int_distribution<int>& dist, const Instance& inst) {
+        Move try2optLocal(const std::vector<int>& route, const Instance& inst) {
             int n = inst.GetN();
-            int i, j;
-
-            do {
-                i = dist(rnd);
-                j = dist(rnd);
-                if (i > j) std::swap(i, j);
-            } while (j - i < 2 || (i == 0 && j == n - 1));
+            if (n < 4) return {};
+            std::uniform_int_distribution<int> i_dist(0, n - 3);
+            int i = i_dist(rnd);
+            int j_hi = std::min(n - 1, i + std::max(2, look_ahead));
+            if (j_hi - i < 2) return {};
+            std::uniform_int_distribution<int> j_dist(i + 2, j_hi);
+            int j = j_dist(rnd);
+            if (i == 0 && j == n - 1) return {};
 
             double delta = inst.Distance(route[i], route[j]) +
                            inst.Distance(route[i+1], route[j+1]) -
@@ -148,15 +137,20 @@ namespace tsp {
             return {i, j, -1, 2, 0, delta};
         }
 
-        Move try3opt(const std::vector<int>& route, std::uniform_int_distribution<int>& dist, const Instance& inst) {
+        Move try3optLocal(const std::vector<int>& route, const Instance& inst) {
             int n = (int)inst.GetN();
-            int i, j, k;
-
-            do {
-                std::vector<int> idx = {dist(rnd), dist(rnd), dist(rnd)};
-                std::sort(idx.begin(), idx.end());
-                i = idx[0], j = idx[1], k = idx[2];
-            } while (j - i < 2 || k - j < 2 || (i == 0 && k == n - 1));
+            if (n < 6) return {};
+            std::uniform_int_distribution<int> i_dist(0, n - 5);
+            int i = i_dist(rnd);
+            int j_hi = std::min(n - 3, i + std::max(2, look_ahead));
+            if (j_hi - i < 2) return {};
+            std::uniform_int_distribution<int> j_dist(i + 2, j_hi);
+            int j = j_dist(rnd);
+            int k_hi = std::min(n - 1, j + std::max(2, look_ahead));
+            if (k_hi - j < 2) return {};
+            std::uniform_int_distribution<int> k_dist(j + 2, k_hi);
+            int k = k_dist(rnd);
+            if (i == 0 && k == n - 1) return {};
 
             double d_old = inst.Distance(route[i], route[i+1]) +
                            inst.Distance(route[j], route[j+1]) +
