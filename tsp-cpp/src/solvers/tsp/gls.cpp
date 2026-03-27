@@ -12,6 +12,7 @@ namespace tsp {
         size_t max_iter = 0;
         double lambda = 0.2;
 
+
         void Configure(const std::unordered_map<std::string, std::string> &opts) override {
             if (opts.contains("time")) {
                 time_limit = std::stod(opts.at("time"));
@@ -45,7 +46,9 @@ namespace tsp {
             double best_len = inst.RouteLength(best_route);
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
-                ImprovedTwoOpt(route, penalties);
+                logger.AddDebug("start TwoOpt " + std::to_string(iter_id + 1));
+                ImprovedTwoOpt(route, penalties, start);
+                logger.AddDebug("end " + std::to_string(iter_id + 1));
                 const double cur_len = inst.RouteLength(route);
                 if (cur_len <= inst.RouteLength(best_route)) {
                     best_route = route;
@@ -60,7 +63,6 @@ namespace tsp {
                     double utility = inst.Distance(route[i], route[i + 1]) / (1 + penalties[route[i]][route[i + 1]]);
                     max_utility = std::max(max_utility, utility);
                 }
-
                 double eps = 1e-8;
                 for (size_t i = 0; i < n; i++) {
                     double utility = inst.Distance(route[i], route[i + 1]) / (1 + penalties[route[i]][route[i + 1]]);
@@ -80,16 +82,21 @@ namespace tsp {
                     std::chrono::high_resolution_clock::now() - start).count());
         }
 
-        void ImprovedTwoOpt(std::vector<int> &route, const std::vector<std::vector<int>> &penalties) const {
+        void ImprovedTwoOpt(std::vector<int> &route, const std::vector<std::vector<int>> &penalties, std::chrono::time_point<std::chrono::system_clock> start) const {
             const Instance &inst = Instance::GetInstance();
             int n = inst.GetN();
-            auto start = std::chrono::high_resolution_clock::now();
             bool found_improvement = true;
             auto improve_dist = [&penalties, &inst, this](int i, int j) {
                 return inst.Distance(i, j) + lambda * penalties[i][j];
             };
+            auto &logger = app::Logger::GetInstance();
+            logger.AddDebug("Start while");
             while (found_improvement) {
+                logger.AddDebug("do " + std::to_string(inst.RouteLength(route)));
                 found_improvement = false;
+                if (ElapsedTime(start) >= time_limit) {
+                    break;
+                }
                 for (int i = 0; i < n - 1; ++i) {
                     for (int j = i + 2; j < n; ++j) {
                         if (improve_dist(route[i], route[i + 1]) + improve_dist(route[j], route[j + 1]) >
