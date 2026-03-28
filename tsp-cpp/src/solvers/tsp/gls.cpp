@@ -46,9 +46,7 @@ namespace tsp {
             double best_len = inst.RouteLength(best_route);
             for (size_t iter_id = 0; (iter_id < max_iter || max_iter == 0) &&
                                      (ElapsedTime(start) < time_limit || time_limit <= 0); ++iter_id) {
-                logger.AddDebug("start TwoOpt " + std::to_string(iter_id + 1));
                 ImprovedTwoOpt(route, penalties, start);
-                logger.AddDebug("end " + std::to_string(iter_id + 1));
                 const double cur_len = inst.RouteLength(route);
                 if (cur_len <= inst.RouteLength(best_route)) {
                     best_route = route;
@@ -56,6 +54,7 @@ namespace tsp {
                         best_len = cur_len;
                         logger.AddDebug("gls: improved route_len=" + std::to_string(best_len) +
                                         ", iter=" + std::to_string(iter_id + 1));
+                        logger.AddNewSolution("New", best_len);
                     }
                 }
                 double max_utility = 0;

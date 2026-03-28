@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "../include/json.hpp"
+
 namespace app {
 
     Logger &Logger::GetInstance() {
@@ -73,11 +75,12 @@ namespace app {
         std::lock_guard<std::mutex> lock(mtx);
         if (!configured) return;
 
+        const double elapsed_seconds = ElapsedSecondsLocked();
         latest_route_snapshot = route_snapshot;
 
         std::ostringstream new_solution;
         new_solution << "[INFO] t+" << std::fixed << std::setprecision(3)
-                     << ElapsedSecondsLocked() << "s | New solution from " << source
+                     << elapsed_seconds << "s | New solution from " << source
                      << ", objective=" << objective_value;
         info_events.push_back(new_solution.str());
 
@@ -86,11 +89,11 @@ namespace app {
             best_objective = objective_value;
             best_route_snapshot = route_snapshot;
             std::ostringstream improvement_point;
-            improvement_point << "t+" << std::fixed << std::setprecision(3) << ElapsedSecondsLocked() << "s";
-            improvements.push_back({improvement_point.str(), source, objective_value, route_snapshot});
+            improvement_point << "t+" << std::fixed << std::setprecision(3) << elapsed_seconds << "s";
+            improvements.push_back({elapsed_seconds, improvement_point.str(), source, objective_value, route_snapshot});
             std::ostringstream best_improved;
             best_improved << "[INFO] t+" << std::fixed << std::setprecision(3)
-                          << ElapsedSecondsLocked() << "s | Best improved to " << objective_value
+                          << elapsed_seconds << "s | Best improved to " << objective_value
                           << " by " << source;
             info_events.push_back(best_improved.str());
         }
@@ -205,6 +208,15 @@ namespace app {
             if (latest_file.is_open()) {
                 latest_file << latest_route_snapshot;
             }
+        }
+        nlohmann::json history_json;
+        history_json["history"] = nlohmann::json::array();
+        for (const auto &improvement: improvements) {
+            history_json["history"].push_back({improvement.elapsed_seconds, improvement.objective_value});
+        }
+        std::ofstream history_file("logs/" + task_type + "_" + task_name + "_history.json", std::ios::out | std::ios::trunc);
+        if (history_file.is_open()) {
+            history_file << history_json.dump(2) << "\n";
         }
     }
 

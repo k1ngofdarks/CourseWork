@@ -42,6 +42,7 @@ namespace app {
         ~Logger();
 
         struct ImprovementPoint {
+            double elapsed_seconds;
             std::string timestamp;
             std::string source;
             double objective_value;
