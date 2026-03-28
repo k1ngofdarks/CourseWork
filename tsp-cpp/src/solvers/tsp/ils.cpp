@@ -56,8 +56,9 @@ namespace tsp {
                     route = new_route;
                     if (new_len < best_len) {
                         best_len = new_len;
-                        logger.AddDebug("ils: improved route_len=" + std::to_string(best_len) +
+                        logger.AddInfo("ils: improved route_len=" + std::to_string(best_len) +
                                         ", iter=" + std::to_string(iter_id + 1));
+                        logger.AddNewSolution("New", best_len);
                     }
                 }
             }
