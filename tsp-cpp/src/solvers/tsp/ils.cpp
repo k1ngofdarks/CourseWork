@@ -41,7 +41,7 @@ namespace tsp {
 
             auto nearest = tsp::SolverFactory::Create("nearest");
             auto opt_2 = tsp::SolverFactory::CreateConfigured("2-opt",
-                                                              {std::make_pair("time", std::to_string(time_limit))});
+                                                              {std::make_pair("time", std::to_string(3))});
             nearest->Solve(route);
             opt_2->Solve(route);
             double best_len = inst.RouteLength(route);
